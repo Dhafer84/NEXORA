@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # "none" keeps the assistant disabled; "simulated" is a test double, never a real AI.
     nexora_ai_provider: Literal["none", "simulated", "openai_compatible"] = "none"
     nexora_ai_base_url: str = "https://integrate.api.nvidia.com/v1"
-    nexora_ai_model: str = Field(default="meta/llama-3.3-70b-instruct", min_length=1)
+    nexora_ai_model: str = Field(default="nvidia/nemotron-3-ultra-550b-a55b", min_length=1)
     nexora_ai_api_key_file: str = "/run/secrets/ai_api_key"
     nexora_ai_timeout_seconds: float = Field(default=30, gt=0, le=120)
     nexora_ai_turn_deadline_seconds: float = Field(default=90, gt=0, le=300)

@@ -56,7 +56,7 @@ def test_request_format_and_tool_call_parsing(tmp_path):
     result = provider.complete([{"role": "user", "content": "CPU ?"}], tools, timeout=5)
     assert seen["auth"] == f"Bearer {AI_KEY}"
     assert seen["url"] == "https://integrate.api.nvidia.com/v1/chat/completions"
-    assert seen["body"]["model"] == "meta/llama-3.3-70b-instruct"
+    assert seen["body"]["model"] == "nvidia/nemotron-3-ultra-550b-a55b"
     assert seen["body"]["tools"] == tools
     assert result.text == ""
     assert result.tool_calls[0].name == "server_metrics"

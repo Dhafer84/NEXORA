@@ -8,7 +8,7 @@ services:
     environment:
       NEXORA_AI_PROVIDER: openai_compatible
       NEXORA_AI_BASE_URL: ${NEXORA_AI_BASE_URL:-https://integrate.api.nvidia.com/v1}
-      NEXORA_AI_MODEL: ${NEXORA_AI_MODEL:-meta/llama-3.3-70b-instruct}
+      NEXORA_AI_MODEL: ${NEXORA_AI_MODEL:-nvidia/nemotron-3-ultra-550b-a55b}
       NEXORA_AI_API_KEY_FILE: /run/secrets/ai_api_key
     secrets: [ai_api_key]
 

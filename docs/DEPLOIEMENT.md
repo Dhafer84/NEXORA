@@ -148,7 +148,7 @@ Ne jamais supprimer le volume `postgres_data` lors d’un retour arrière.
 
 Le moteur parle à toute API compatible OpenAI Chat Completions avec appels
 d’outils. Configuration retenue : NVIDIA (`https://integrate.api.nvidia.com/v1`,
-modèle `meta/llama-3.3-70b-instruct`). Grok/xAI : `NEXORA_AI_BASE_URL=https://api.x.ai/v1`
+modèle `nvidia/nemotron-3-ultra-550b-a55b`). Le catalogue NVIDIA évolue : un modèle retiré répond `HTTP 410` ou `404` (`ai_rejected`). Lister les modèles disponibles avec `GET https://integrate.api.nvidia.com/v1/models` et changer `NEXORA_AI_MODEL`. Alternative rapide vérifiée : `nvidia/nemotron-3.5-lightning-30b-a3b`. Grok/xAI : `NEXORA_AI_BASE_URL=https://api.x.ai/v1`
 et le modèle voulu, par exemple dans `.env` (valeurs non secrètes).
 
 Créer la clé **sur le serveur**, sans la passer en argument de commande ni
