@@ -15,14 +15,16 @@ H="Authorization: Bearer $NEXORA_API_KEY"
 
 ## Santé et serveur
 
-| Méthode et route | Fonction |
-| --- | --- |
-| `GET /health/live` | Processus actif, sans clé ni base |
-| `GET /health/ready` | Connexion et requête PostgreSQL |
-| `GET /api/v1/auth/check` | Vérifie la clé |
-| `GET /api/v1/server/metrics` | CPU, mémoire, disque, unités, date et périmètre |
+| Méthode et route | Permission | Fonction |
+| --- | --- | --- |
+| `GET /health/live` | aucune (sans clé) | Processus actif, sans base |
+| `GET /health/ready` | `database:read` | Connexion et requête PostgreSQL |
+| `GET /api/v1/auth/check` | clé seule | Vérifie la clé |
+| `GET /api/v1/server/metrics` | `server:read` | CPU, mémoire, disque, unités, date et périmètre |
 
-Ces routes ne dépendent ni du fournisseur IA ni des tables métier.
+Ces routes ne dépendent ni du fournisseur IA ni des tables métier. Elles exigent
+la même permission que l’outil équivalent du registre (`database_status`,
+`server_metrics`) : sans elle, `403 permission_denied`.
 
 ## Outils
 
@@ -108,9 +110,26 @@ soumise à validation arrête le tour : la réponse indique l’identifiant et
 l’expiration de la demande. Après `execute`, le résultat est ajouté à la
 conversation.
 
+À chaque message, le serveur fournit au modèle l’état actuel des 10 dernières
+actions de la conversation (outil, paramètres, statut d’exécution et de
+validation, résultat ou code d’erreur), lu en base après mise à jour des
+expirations. Cet état fait foi : une action approuvée puis exécutée, refusée ou
+expirée est connue du modèle au tour suivant, sans réexécution. Les anciens avis
+« Validation requise » de l’historique sont annotés avec le nouvel état.
+
 Limites par défaut : 4 000 caractères par message ; 4 appels d’outils et
 5 échanges avec le modèle par message ; 30 s par appel au fournisseur et 90 s
-par tour ; 20 messages d’historique ; 1 024 jetons de réponse. Un seul tour à la
+par tour ; 20 messages d’historique ; 1 024 jetons de réponse ; 1 Mo par réponse
+du fournisseur.
+
+Durées : le délai d’un appel au fournisseur est un plafond total (connexion,
+envoi et lecture), et non un délai d’inactivité. Le budget du tour est revérifié
+avant chaque outil : aucun outil ne démarre après l’échéance, et l’attente d’un
+outil est limitée au temps restant. Un outil déjà démarré qui dépasse sa limite
+est marqué `timed_out` ; son résultat est ignoré mais son fil se termine en
+arrière-plan, borné par les limites internes des outils de lecture (requête
+PostgreSQL de 5 s au plus). Le dépassement total d’un tour se limite donc à
+l’enregistrement final (quelques dizaines de millisecondes). Un seul tour à la
 fois par conversation (`409 turn_in_progress`).
 
 Erreurs : `503 ai_not_configured` (aucun fournisseur ou clé absente) ;

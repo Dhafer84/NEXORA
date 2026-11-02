@@ -1,4 +1,7 @@
 import json
+import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +11,16 @@ from app.ai.base import ProviderError, ProviderReply, ToolCall
 from app.config import Settings
 
 MAX_RESPONSE_BYTES = 1_000_000
+# httpx timeouts apply per operation (connect, each read); the pool enforces a total cap.
+_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="nexora-ai")
+
+
+class _Deadline(Exception):
+    pass
+
+
+class _TooLarge(Exception):
+    pass
 
 
 class OpenAICompatibleProvider:
@@ -49,31 +62,49 @@ class OpenAICompatibleProvider:
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
+        deadline = time.monotonic() + timeout
+        future = _pool.submit(self._post, key, payload, timeout, deadline)
         try:
-            response = self.client.post(
-                self.base_url + "/chat/completions",
-                json=payload,
-                headers={"Authorization": f"Bearer {key}"},
-                timeout=timeout,
-            )
-        except httpx.TimeoutException:
+            status_code, content = future.result(timeout=timeout)
+        except (FutureTimeout, _Deadline, httpx.TimeoutException):
             raise ProviderError("timeout", "Le fournisseur IA n’a pas répondu à temps") from None
+        except _TooLarge:
+            raise ProviderError("bad_response", "Réponse du fournisseur trop volumineuse") from None
         except httpx.HTTPError:
             raise ProviderError("unavailable", "Fournisseur IA injoignable") from None
         # Response bodies are never logged or returned: they may echo request data.
-        if response.status_code in (401, 403):
+        if status_code in (401, 403):
             raise ProviderError("auth", "Clé du fournisseur IA refusée")
-        if response.status_code == 429:
+        if status_code == 429:
             raise ProviderError("rate_limited", "Quota ou limite de débit du fournisseur atteint")
-        if response.status_code >= 500:
+        if status_code >= 500:
             raise ProviderError("unavailable", "Fournisseur IA temporairement indisponible")
-        if response.status_code != 200:
+        if status_code != 200:
             raise ProviderError(
-                "rejected", f"Requête refusée par le fournisseur (HTTP {response.status_code})"
+                "rejected", f"Requête refusée par le fournisseur (HTTP {status_code})"
             )
-        if len(response.content) > MAX_RESPONSE_BYTES:
-            raise ProviderError("bad_response", "Réponse du fournisseur trop volumineuse")
-        return _parse(response.content)
+        return _parse(content)
+
+    def _post(
+        self, key: str, payload: dict[str, Any], timeout: float, deadline: float
+    ) -> tuple[int, bytes]:
+        # Streamed so that size and total duration are checked while reading.
+        with self.client.stream(
+            "POST",
+            self.base_url + "/chat/completions",
+            json=payload,
+            headers={"Authorization": f"Bearer {key}"},
+            timeout=timeout,
+        ) as response:
+            chunks, size = [], 0
+            for chunk in response.iter_bytes():
+                size += len(chunk)
+                if size > MAX_RESPONSE_BYTES:
+                    raise _TooLarge()
+                if time.monotonic() > deadline:
+                    raise _Deadline()
+                chunks.append(chunk)
+            return response.status_code, b"".join(chunks)
 
 
 def _parse(content: bytes) -> ProviderReply:

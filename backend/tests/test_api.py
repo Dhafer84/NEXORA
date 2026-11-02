@@ -117,3 +117,25 @@ def test_host_mode_requires_real_sources(settings, monkeypatch, tmp_path):
 def test_no_public_interactive_api_schema(client):
     for path in ("/docs", "/redoc", "/openapi.json"):
         assert client.get(path).status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("path", "permission"),
+    [("/api/v1/server/metrics", "server:read"), ("/health/ready", "database:read")],
+)
+def test_legacy_routes_apply_registry_permissions(settings, monkeypatch, path, permission):
+    monkeypatch.setattr("app.main.check_database", lambda _: None)
+    restricted = settings.model_copy(update={"nexora_permissions": ""})
+    with TestClient(create_app(restricted)) as client:
+        response = client.get(path, headers=auth())
+        assert response.status_code == 403
+        assert response.json()["detail"] == {
+            "code": "permission_denied",
+            "message": f"Permission manquante : {permission}",
+        }
+        assert client.get(path).status_code == 401
+        assert client.get("/health/live").status_code == 200
+        assert client.get("/api/v1/auth/check", headers=auth()).status_code == 200
+    allowed = settings.model_copy(update={"nexora_permissions": permission})
+    with TestClient(create_app(allowed)) as client:
+        assert client.get(path, headers=auth()).status_code == 200

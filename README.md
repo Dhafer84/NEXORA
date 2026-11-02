@@ -29,9 +29,9 @@ configuration complémentaire décrit dans le [guide de déploiement](docs/DEPLO
 | Route | Protection | Fonction |
 | --- | --- | --- |
 | `GET /health/live` | Réseau privé, sans clé | Vérifie que le processus répond |
-| `GET /health/ready` | Clé Bearer | Vérifie une connexion et une requête PostgreSQL |
+| `GET /health/ready` | Clé + `database:read` | Vérifie une connexion et une requête PostgreSQL |
 | `GET /api/v1/auth/check` | Clé Bearer | Vérifie la clé d’accès |
-| `GET /api/v1/server/metrics` | Clé Bearer | CPU, RAM, disque, unités, date et périmètre |
+| `GET /api/v1/server/metrics` | Clé + `server:read` | CPU, RAM, disque, unités, date et périmètre |
 | `GET /api/v1/tools`, `POST /api/v1/tools/{nom}/invoke` | Clé Bearer | Registre et exécution contrôlée des outils |
 | `/api/v1/approvals…` | Clé Bearer | Consultation, approbation, refus et exécution unique |
 | `/api/v1/conversations…` | Clé Bearer | Conversations, messages et historique |

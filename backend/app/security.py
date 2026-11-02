@@ -27,3 +27,20 @@ def require_api_key(
 def get_principal(request: Request, _: Annotated[None, Depends(require_api_key)]) -> Principal:
     # One personal key for now; mobile accounts and sessions come in a later lot.
     return Principal(name="personal", permissions=request.app.state.settings.permissions)
+
+
+def require_permission(permission: str):
+    """Dependency for routes outside the tool registry that expose the same data."""
+
+    def check(principal: Annotated[Principal, Depends(get_principal)]) -> Principal:
+        if permission not in principal.permissions:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "permission_denied",
+                    "message": f"Permission manquante : {permission}",
+                },
+            )
+        return principal
+
+    return check

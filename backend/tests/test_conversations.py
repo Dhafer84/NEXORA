@@ -8,6 +8,7 @@ from app.database import connect
 from app.main import create_app
 from conftest import KEY, auth
 from fastapi.testclient import TestClient
+from pydantic import BaseModel, ConfigDict
 
 AI_KEY = "nvapi-" + "q4" * 30
 
@@ -322,3 +323,166 @@ def test_streamed_oversize_body_is_rejected(app_factory):
             headers=auth() | {"content-type": "application/json"},
         )
     assert response.status_code == 413
+
+
+# ----- Persisted actions in later turns ---------------------------------------
+
+
+def start_action(client, provider):
+    conversation = new_conversation(client)
+    body = send(client, conversation, "Lance l’action de test").json()
+    approval = body["tool_executions"][0]["approval"]
+    provider.replies = [ProviderReply("Bilan.")]
+    return conversation, approval
+
+
+def system_context(provider):
+    return provider.requests[-1]["messages"][0]["content"]
+
+
+def test_approved_result_reaches_next_turn_without_rerun(app_factory, db_settings):
+    provider = Scripted(call("test_action", '{"label": "bilan", "value": 4}'))
+    with app_factory(provider) as client:
+        conversation, approval = start_action(client, provider)
+        prefix = f"/api/v1/approvals/{approval['id']}"
+        client.post(
+            prefix + "/approve", json={"arguments_hash": approval["arguments_hash"]}, headers=auth()
+        )
+        done = client.post(
+            prefix + "/execute", json={"arguments": approval["arguments"]}, headers=auth()
+        )
+        executed_at = done.json()["result"]["executed_at"]
+        body = send(client, conversation, "Quel est le résultat de cette action ?").json()
+    assert body["status"] == "completed" and body["tool_executions"] == []
+    context = system_context(provider)
+    assert '"execution": "succeeded"' in context
+    assert '"approval": "consumed"' in context
+    assert executed_at[:19] in context and '"label": "bilan"' in context
+    notice = next(
+        m
+        for m in provider.requests[-1]["messages"]
+        if m["role"] == "assistant" and "Validation requise" in m["content"]
+    )
+    assert "désormais « consumed »" in notice["content"]
+    with connect(db_settings) as connection:
+        runs = connection.execute(
+            "SELECT count(*) AS n FROM tool_executions WHERE status = 'succeeded'"
+        ).fetchone()["n"]
+    assert runs == 1
+
+
+def test_rejected_action_is_reported_in_next_turn(app_factory):
+    provider = Scripted(call("test_action", '{"label": "refus", "value": 1}'))
+    with app_factory(provider) as client:
+        conversation, approval = start_action(client, provider)
+        client.post(f"/api/v1/approvals/{approval['id']}/reject", json={}, headers=auth())
+        send(client, conversation, "Où en est l’action ?")
+    context = system_context(provider)
+    assert '"approval": "rejected"' in context
+    assert '"error": "approval_rejected"' in context
+    assert '"execution": "denied"' in context
+
+
+def test_expired_action_is_reported_in_next_turn(app_factory, db_settings):
+    provider = Scripted(call("test_action", '{"label": "delai", "value": 2}'))
+    with app_factory(provider) as client:
+        conversation, approval = start_action(client, provider)
+        with connect(db_settings) as connection:
+            connection.execute(
+                "UPDATE approval_requests SET expires_at = now() - interval '1 s' WHERE id = %s",
+                (approval["id"],),
+            )
+        send(client, conversation, "Et l’action ?")
+    context = system_context(provider)
+    assert '"approval": "expired"' in context
+    assert '"error": "approval_expired"' in context
+
+
+def test_no_actions_means_no_action_context(app_factory):
+    provider = Scripted(ProviderReply("ok"))
+    with app_factory(provider) as client:
+        send(client, new_conversation(client), "Bonjour")
+    assert "État actuel des actions" not in system_context(provider)
+
+
+# ----- Global time budget ----------------------------------------------------------
+
+
+class SlowParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class SlowResult(BaseModel):
+    ok: bool
+
+
+def slow_tool_app(app_factory, provider_delay, tool_delay, budget, starts):
+    import time
+
+    from app.tools.registry import ToolSpec
+
+    origin = []
+
+    def slow_read(context, params):
+        starts.append(time.monotonic() - origin[0])
+        time.sleep(tool_delay)
+        return SlowResult(ok=True)
+
+    class SlowProvider(Scripted):
+        def complete(self, messages, tools, timeout):
+            self.requests.append(timeout)
+            time.sleep(provider_delay)
+            return ProviderReply(
+                "", [ToolCall("c1", "slow_read", "{}"), ToolCall("c2", "slow_read", "{}")]
+            )
+
+    provider = SlowProvider(ProviderReply(""))
+    client = app_factory(provider, nexora_ai_turn_deadline_seconds=budget)
+    client.app.state.tools.registry.register(
+        ToolSpec(
+            "slow_read",
+            "Lecture lente de test",
+            SlowParams,
+            SlowResult,
+            frozenset({"server:read"}),
+            "low",
+            False,
+            5,
+            slow_read,
+            lambda p: "Lecture",
+        )
+    )
+    return client, origin
+
+
+def test_no_tool_starts_after_the_turn_deadline(app_factory):
+    import time
+
+    starts = []
+    client, origin = slow_tool_app(app_factory, 1.05, 0.4, 1.3, starts)
+    with client:
+        conversation = new_conversation(client)
+        origin.append(time.monotonic())
+        body = send(client, conversation, "Vérifie").json()
+        elapsed = time.monotonic() - origin[0]
+    assert body["status"] == "limit_reached"
+    # The first tool starts in budget but only gets the remaining time; the second never starts.
+    assert len(starts) == 1 and starts[0] < 1.3
+    assert [e["status"] for e in body["tool_executions"]] == ["timed_out"]
+    assert elapsed < 1.6
+
+
+def test_tool_wait_is_capped_by_remaining_budget(app_factory):
+    import time
+
+    starts = []
+    client, origin = slow_tool_app(app_factory, 1.0, 2.0, 1.3, starts)
+    with client:
+        conversation = new_conversation(client)
+        origin.append(time.monotonic())
+        body = send(client, conversation, "Vérifie").json()
+        elapsed = time.monotonic() - origin[0]
+    assert body["status"] == "limit_reached"
+    assert body["tool_executions"][0]["status"] == "timed_out"
+    assert len(body["tool_executions"]) == 1
+    assert elapsed < 1.6

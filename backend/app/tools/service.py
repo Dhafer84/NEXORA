@@ -164,8 +164,12 @@ class ToolService:
         *,
         source: Literal["api", "assistant"],
         conversation_id: UUID | None = None,
+        max_seconds: float | None = None,
     ) -> ExecutionView:
-        """Check, then either run a tool or create a persistent approval request."""
+        """Check, then either run a tool or create a persistent approval request.
+
+        ``max_seconds`` caps the wait below the tool's own timeout (caller's remaining budget).
+        """
         spec = self.registry.get(name)
         if spec is None:
             safe = SAFE_NAME.sub("_", str(name))[:64] or "_"
@@ -218,7 +222,7 @@ class ToolService:
                VALUES (%s, %s, %s, %s, %s, 'running', now()) RETURNING *""",
             (conversation_id, spec.name, Jsonb(arguments), digest, source),
         ).fetchone()
-        return self._run(connection, spec, params, row["id"])
+        return self._run(connection, spec, params, row["id"], max_seconds=max_seconds)
 
     # ----- Execution --------------------------------------------------------
 
@@ -229,17 +233,23 @@ class ToolService:
         params: BaseModel,
         execution_id: UUID,
         approval: ApprovalView | None = None,
+        max_seconds: float | None = None,
     ) -> ExecutionView:
+        limit = (
+            spec.timeout_seconds if max_seconds is None else min(spec.timeout_seconds, max_seconds)
+        )
+        # A thread cannot be interrupted: on timeout the result is discarded and the handler
+        # finishes in the background, bounded by its own internal limits (read-only tools).
         future = _pool.submit(spec.handler, self.context, params)
         result = None
         error_code = error_message = None
         try:
-            output = future.result(timeout=spec.timeout_seconds)
+            output = future.result(timeout=max(limit, 0))
             result = spec.result.model_validate(output).model_dump(mode="json")
             status: ExecutionStatus = "succeeded"
         except FutureTimeout:
             status, error_code = "timed_out", "timeout"
-            error_message = f"Délai maximal de {spec.timeout_seconds:g} s dépassé"
+            error_message = f"Délai maximal de {limit:.3g} s dépassé"
         except Exception as error:  # noqa: BLE001 - handler errors are reported, not raised
             status, error_code, error_message = "failed", "tool_failed", "L’outil a échoué"
             logger.warning("tool_failed tool=%s error=%s", spec.name, type(error).__name__)

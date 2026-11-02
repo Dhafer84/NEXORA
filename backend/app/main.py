@@ -15,7 +15,7 @@ from app.api import router
 from app.config import Settings
 from app.database import check_database
 from app.metrics import ServerMetrics, collect_metrics
-from app.security import require_api_key
+from app.security import require_api_key, require_permission
 from app.tools.builtin import build_registry
 from app.tools.service import ToolService
 
@@ -98,10 +98,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def live() -> Health:
         return Health(status="ok")
 
+    # Same permissions as the matching registry tools: database_status and server_metrics.
     @app.get(
         "/health/ready",
         response_model=Health,
-        dependencies=[Depends(require_api_key)],
+        dependencies=[Depends(require_permission("database:read"))],
         tags=["health"],
     )
     def ready() -> Health:
@@ -116,7 +117,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get(
         "/api/v1/server/metrics",
         response_model=ServerMetrics,
-        dependencies=[Depends(require_api_key)],
+        dependencies=[Depends(require_permission("server:read"))],
         tags=["server"],
     )
     def metrics() -> ServerMetrics:

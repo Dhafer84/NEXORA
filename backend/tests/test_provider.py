@@ -108,3 +108,25 @@ def test_missing_key_file_means_not_configured(tmp_path):
 def test_provider_url_must_be_https_without_credentials(url):
     with pytest.raises(ValidationError):
         Settings(nexora_api_key=KEY, postgres_password=PASSWORD, nexora_ai_base_url=url)
+
+
+def test_provider_timeout_is_a_total_cap(tmp_path):
+    import time
+
+    def slow(request):
+        time.sleep(1.5)
+        return reply({"content": "trop tard"})
+
+    provider = make(tmp_path, slow)
+    started = time.monotonic()
+    with pytest.raises(ProviderError) as error:
+        provider.complete([{"role": "user", "content": "x"}], [], timeout=0.4)
+    assert error.value.code == "timeout"
+    assert time.monotonic() - started < 0.8
+
+
+def test_oversize_provider_response_is_refused(tmp_path):
+    big = httpx.Response(200, content=b"x" * 1_100_000)
+    with pytest.raises(ProviderError) as error:
+        make(tmp_path, lambda request: big).complete([], [], timeout=5)
+    assert error.value.code == "bad_response"

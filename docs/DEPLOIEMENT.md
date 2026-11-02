@@ -189,7 +189,10 @@ et `NEXORA_AI_TURN_DEADLINE_SECONDS`.
 `NEXORA_PERMISSIONS` (défaut `server:read,database:read,test:execute`) liste les
 permissions de la clé personnelle. Retirer une permission retire l’outil
 correspondant du modèle et fait refuser toute exécution, y compris d’une action
-déjà approuvée.
+déjà approuvée. Les routes historiques suivent les mêmes règles :
+`/api/v1/server/metrics` exige `server:read` et `/health/ready` exige
+`database:read`. `/health/live` reste sans clé pour le contrôle Docker et
+`scripts/check_api.py` suppose les permissions par défaut.
 
 ## Sauvegarde et vérification de restauration
 
