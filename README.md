@@ -3,7 +3,9 @@
 Assistant personnel Android et serveur Ubuntu. Le backend FastAPI protégé fournit
 PostgreSQL, les métriques CPU, RAM et disque, un registre d’outils contrôlés, des
 validations persistantes et un moteur de conversation indépendant du fournisseur
-IA. L’application mobile sera développée dans un lot suivant.
+IA. L’application Android Flutter (`mobile/flutter_app/`) donne accès aux
+conversations, aux validations et à l’état du serveur : voir son
+[guide](mobile/flutter_app/README.md).
 
 ## Démarrage local
 
@@ -42,7 +44,8 @@ Détails, codes d’erreur, limites et exemples : [docs/API.md](docs/API.md).
 L’authentification utilise une clé aléatoire personnelle, associée à une liste de
 permissions (`NEXORA_PERMISSIONS`). Le modèle IA ne voit que les outils déclarés
 et autorisés ; aucun accès SSH, aucune commande libre ni appel de fonction
-arbitraire ne lui est exposé. Les comptes et sessions mobiles viendront plus tard.
+arbitraire ne lui est exposé. L’application Android utilise la même clé, gardée dans
+le stockage sécurisé du téléphone ; il n’y a pas encore de comptes ni de sessions.
 
 ## Fournisseur IA
 
@@ -89,7 +92,7 @@ majeures explicites et reçoivent les mises à jour de leur série.
 - `backend/app/ai/` : interface fournisseur, adaptateur compatible OpenAI, simulateur, moteur.
 - `backend/app/migrations/` : migrations SQL versionnées (`python -m app.migrate`).
 - `backend/tests/` : accès, permissions, validations, concurrence, fournisseur, secrets.
-- `mobile/flutter_app/` : emplacement de la future application.
+- `mobile/flutter_app/` : application Android Flutter, ses tests et son guide.
 - `infrastructure/` : Compose, métriques Ubuntu et fournisseur IA facultatif.
 - `scripts/` : génération locale des secrets et vérification de l’API.
 - `docs/` : API, déploiement et choix techniques.
