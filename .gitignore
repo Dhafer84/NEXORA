@@ -44,3 +44,6 @@ htmlcov/
 *.sqlite3
 /backups/
 /data/
+
+# Runtime local (points de montage sans données versionnées)
+/.runtime/

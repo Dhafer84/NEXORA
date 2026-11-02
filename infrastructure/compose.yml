@@ -1,0 +1,60 @@
+name: nexora
+
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nexora
+      POSTGRES_DB: nexora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Générer le fichier .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexora -d nexora"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks: [private]
+    mem_limit: 512m
+    cpus: 1.0
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  backend:
+    build: ../backend
+    restart: unless-stopped
+    init: true
+    environment:
+      NEXORA_API_KEY: ${NEXORA_API_KEY:?Générer le fichier .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Générer le fichier .env}
+      POSTGRES_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${NEXORA_HTTP_PORT:-8100}:8000"
+    read_only: true
+    tmpfs: ["/tmp:size=16m,noexec,nosuid"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [private, api]
+    mem_limit: 256m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+networks:
+  api: {}
+  private:
+    internal: true
+
+volumes:
+  postgres_data:

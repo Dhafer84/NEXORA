@@ -1,0 +1,24 @@
+# Ubuntu only: read aggregate CPU/RAM and the filesystem containing this checkout.
+# No Docker socket, SSH access, host root tree or privileged container.
+services:
+  backend:
+    environment:
+      NEXORA_METRICS_SCOPE: host
+      NEXORA_PROCFS_PATH: /host/proc
+      NEXORA_DISK_PATH: /host-disk
+    volumes:
+      - type: bind
+        source: /proc/stat
+        target: /host/proc/stat
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: /proc/meminfo
+        target: /host/proc/meminfo
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ../.runtime/host-disk
+        target: /host-disk
+        read_only: true
+        bind: {create_host_path: false}
