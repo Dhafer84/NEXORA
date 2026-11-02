@@ -113,15 +113,20 @@ Depuis `~/nexora`, avec `$C` défini comme ci-dessus :
 
 ```sh
 git fetch && git log --oneline -1 origin/main
-umask 077; mkdir -p backups
-$C exec -T db pg_dump -U nexora -d nexora -Fc > backups/nexora_avant_maj_$(date +%Y%m%d_%H%M%S).dump
-git rev-parse HEAD > backups/commit_avant_maj.txt
+( umask 077; mkdir -p backups
+  $C exec -T db pg_dump -U nexora -d nexora -Fc < /dev/null > backups/nexora_avant_maj_$(date +%Y%m%d_%H%M%S).dump
+  git rev-parse HEAD > backups/commit_avant_maj.txt )
 git pull --ff-only
 $C build
 $C run --rm backend python -m app.migrate up
 $C up -d --wait
 python3 scripts/check_api.py https://NOM_DNS_DU_SERVEUR:8101 --parcours
 ```
+
+Le `umask 077` reste limité à la sous-commande de sauvegarde : appliqué au
+`git pull`, il rendrait les fichiers du dépôt illisibles pour les autres comptes.
+L’image corrige de toute façon les droits de lecture de `app/` à la construction.
+`< /dev/null` empêche `exec -T` de consommer l’entrée d’un script.
 
 `--parcours` exécute un outil, un cycle de validation complet avec l’action de test
 sans effet, et crée une conversation « Vérification ». Il écrit donc ces traces dans
@@ -201,7 +206,7 @@ activée automatiquement. Définir fréquence, rétention et stockage externe av
 d’ajouter des données personnelles importantes.
 
 ```sh
-umask 077
+umask 077   # dans un terminal dédié à la sauvegarde, pas avant un git pull
 mkdir -p backups
 docker compose --env-file .env -f infrastructure/compose.yml exec -T db pg_dump -U nexora -d nexora -Fc > backups/nexora.dump
 docker compose --env-file .env -f infrastructure/compose.yml exec -T db createdb -U nexora nexora_restore_test
