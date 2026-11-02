@@ -1,0 +1,17 @@
+# Optional: real AI provider through an OpenAI-compatible API (NVIDIA by default).
+# Add only once ../secrets/ai_api_key exists (mode 600, owned by the deploying user).
+# The key never goes into .env, Git, logs or command arguments.
+services:
+  backend:
+    # Same uid as the owner of the 600 key file, so the secret stays unreadable to others.
+    user: "${NEXORA_UID:-1000}:${NEXORA_GID:-1000}"
+    environment:
+      NEXORA_AI_PROVIDER: openai_compatible
+      NEXORA_AI_BASE_URL: ${NEXORA_AI_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      NEXORA_AI_MODEL: ${NEXORA_AI_MODEL:-meta/llama-3.3-70b-instruct}
+      NEXORA_AI_API_KEY_FILE: /run/secrets/ai_api_key
+    secrets: [ai_api_key]
+
+secrets:
+  ai_api_key:
+    file: ../secrets/ai_api_key

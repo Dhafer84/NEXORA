@@ -4,6 +4,8 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.tools.permissions import Principal
+
 bearer = HTTPBearer(auto_error=False)
 
 
@@ -20,3 +22,8 @@ def require_api_key(
             detail="Authentification requise ou clé invalide",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+def get_principal(request: Request, _: Annotated[None, Depends(require_api_key)]) -> Principal:
+    # One personal key for now; mobile accounts and sessions come in a later lot.
+    return Principal(name="personal", permissions=request.app.state.settings.permissions)

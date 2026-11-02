@@ -5,6 +5,7 @@
 
 # Secrets et configuration locale
 .env
+/secrets/
 .env.*
 !.env.example
 *.pem

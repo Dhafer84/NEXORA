@@ -1,4 +1,5 @@
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,6 +18,24 @@ class Settings(BaseSettings):
     nexora_procfs_path: str = "/proc"
     nexora_disk_path: str = "/"
 
+    # Permissions granted to the personal key, comma separated.
+    nexora_permissions: str = "server:read,database:read,test:execute"
+    nexora_approval_ttl_seconds: int = Field(default=600, ge=30, le=86400)
+    nexora_max_request_bytes: int = Field(default=32768, ge=1024, le=1048576)
+
+    # "none" keeps the assistant disabled; "simulated" is a test double, never a real AI.
+    nexora_ai_provider: Literal["none", "simulated", "openai_compatible"] = "none"
+    nexora_ai_base_url: str = "https://integrate.api.nvidia.com/v1"
+    nexora_ai_model: str = Field(default="meta/llama-3.3-70b-instruct", min_length=1)
+    nexora_ai_api_key_file: str = "/run/secrets/ai_api_key"
+    nexora_ai_timeout_seconds: float = Field(default=30, gt=0, le=120)
+    nexora_ai_turn_deadline_seconds: float = Field(default=90, gt=0, le=300)
+    nexora_ai_max_tool_calls: int = Field(default=4, ge=0, le=10)
+    nexora_ai_max_iterations: int = Field(default=5, ge=1, le=10)
+    nexora_ai_max_input_chars: int = Field(default=4000, ge=100, le=20000)
+    nexora_ai_max_output_tokens: int = Field(default=1024, ge=64, le=8192)
+    nexora_ai_history_messages: int = Field(default=20, ge=1, le=100)
+
     @field_validator("nexora_api_key", "postgres_password")
     @classmethod
     def validate_secret(cls, value: SecretStr) -> SecretStr:
@@ -29,3 +48,17 @@ class Settings(BaseSettings):
         ):
             raise ValueError("Un secret ASCII sans espaces d’au moins 32 caractères est requis")
         return value
+
+    @field_validator("nexora_ai_base_url")
+    @classmethod
+    def validate_base_url(cls, value: str) -> str:
+        url = urlsplit(value)
+        local = url.scheme == "http" and url.hostname in {"127.0.0.1", "localhost", "::1"}
+        if (url.scheme != "https" and not local) or url.username or url.password or url.query:
+            raise ValueError("URL du fournisseur IA : HTTPS sans identifiants requis")
+        return value.rstrip("/")
+
+    @property
+    def permissions(self) -> frozenset[str]:
+        items = (item.strip() for item in self.nexora_permissions.split(","))
+        return frozenset(item for item in items if item)
