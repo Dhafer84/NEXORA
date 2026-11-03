@@ -86,6 +86,39 @@ void main() {
     expect(state.baseUrl, testBaseUrl);
   });
 
+  group('clé liée à l’adresse', () {
+    const other = 'https://autre.test:8101';
+
+    test('nouvelle adresse sans clé : refus, rien n’est changé', () async {
+      await state.save(testBaseUrl, testApiKey);
+      backend.requests.clear();
+      final problem = await state.save(other, '');
+      expect(problem, AppState.newAddressNeedsKey);
+      expect(state.baseUrl, testBaseUrl);
+      expect(await state.storedKeyFor(other), isNull);
+      await state.refreshPending();
+      expect(
+        backend.requests.map((r) => r.url.host).toSet(),
+        {'nexora.test'},
+        reason: 'aucune requête vers la nouvelle adresse',
+      );
+    });
+
+    test('nouvelle adresse avec sa clé : la clé suit l’adresse', () async {
+      await state.save(testBaseUrl, testApiKey);
+      expect(await state.save(other, 'cle-de-l-autre'), isNull);
+      expect(state.baseUrl, other);
+      expect(await state.storedKeyFor(other), 'cle-de-l-autre');
+      expect(await state.storedKeyFor(testBaseUrl), isNull);
+    });
+
+    test('même adresse (barre finale) : clé conservée', () async {
+      await state.save(testBaseUrl, testApiKey);
+      expect(await state.save('$testBaseUrl/', null), isNull);
+      expect(await state.storedKeyFor(testBaseUrl), testApiKey);
+    });
+  });
+
   test('erreur de rafraîchissement conservée sans planter', () async {
     await state.save(testBaseUrl, testApiKey);
     backend.forbidden.add('/api/v1/approvals');

@@ -70,118 +70,129 @@ class NexoraApi {
     await _send('GET', '/health/ready');
   }
 
-  Future<ServerMetrics> metrics() async =>
-      ServerMetrics.fromJson(await _object('GET', '/api/v1/server/metrics'));
+  Future<ServerMetrics> metrics() =>
+      _object('GET', '/api/v1/server/metrics', ServerMetrics.fromJson);
 
-  Future<AiStatus> aiStatus() async =>
-      AiStatus.fromJson(await _object('GET', '/api/v1/ai/status'));
+  Future<AiStatus> aiStatus() =>
+      _object('GET', '/api/v1/ai/status', AiStatus.fromJson);
 
   // ----- Conversations -------------------------------------------------------
 
-  Future<List<Conversation>> conversations({int limit = 50}) async => [
-    for (final item in await _list('GET', '/api/v1/conversations?limit=$limit'))
-      Conversation.fromJson(item),
-  ];
+  Future<List<Conversation>> conversations({int limit = 50}) =>
+      _list('/api/v1/conversations?limit=$limit', Conversation.fromJson);
 
-  Future<Conversation> createConversation(String title) async =>
-      Conversation.fromJson(
-        await _object('POST', '/api/v1/conversations', body: {'title': title}),
-      );
+  Future<Conversation> createConversation(String title) => _object(
+    'POST',
+    '/api/v1/conversations',
+    Conversation.fromJson,
+    body: {'title': title},
+  );
 
-  Future<ConversationDetail> conversation(String id, {int limit = 200}) async =>
-      ConversationDetail.fromJson(
-        await _object('GET', '/api/v1/conversations/$id?limit=$limit'),
+  Future<ConversationDetail> conversation(String id, {int limit = 200}) =>
+      _object(
+        'GET',
+        '/api/v1/conversations/$id?limit=$limit',
+        ConversationDetail.fromJson,
       );
 
   /// One assistant turn. Never retried automatically: on a timeout the server may
   /// already have stored and processed the message ([ApiError.outcomeUnknown]).
-  Future<TurnResult> sendMessage(String conversationId, String content) async =>
-      TurnResult.fromJson(
-        await _object(
-          'POST',
-          '/api/v1/conversations/$conversationId/messages',
-          body: {'content': content},
-          timeout: turnTimeout,
-        ),
+  Future<TurnResult> sendMessage(String conversationId, String content) =>
+      _object(
+        'POST',
+        '/api/v1/conversations/$conversationId/messages',
+        TurnResult.fromJson,
+        body: {'content': content},
+        timeout: turnTimeout,
       );
 
   // ----- Approvals -----------------------------------------------------------
 
-  Future<List<Approval>> approvals({String? status, int limit = 50}) async {
+  Future<List<Approval>> approvals({String? status, int limit = 50}) {
     final filter = status == null ? '' : '&status=$status';
-    return [
-      for (final item in await _list(
-        'GET',
-        '/api/v1/approvals?limit=$limit$filter',
-      ))
-        Approval.fromJson(item),
-    ];
+    return _list('/api/v1/approvals?limit=$limit$filter', Approval.fromJson);
   }
 
-  Future<Approval> approval(String id) async =>
-      Approval.fromJson(await _object('GET', '/api/v1/approvals/$id'));
+  Future<Approval> approval(String id) =>
+      _object('GET', '/api/v1/approvals/$id', Approval.fromJson);
 
   /// Records the decision only. The hash proves which parameters were shown.
-  Future<Approval> approve(Approval approval) async => Approval.fromJson(
-    await _object(
-      'POST',
-      '/api/v1/approvals/${approval.id}/approve',
-      body: {'arguments_hash': approval.argumentsHash},
-    ),
+  Future<Approval> approve(Approval approval) => _object(
+    'POST',
+    '/api/v1/approvals/${approval.id}/approve',
+    Approval.fromJson,
+    body: {'arguments_hash': approval.argumentsHash},
   );
 
-  Future<Approval> reject(String id, {String? reason}) async =>
-      Approval.fromJson(
-        await _object(
-          'POST',
-          '/api/v1/approvals/$id/reject',
-          body: {
-            if (reason != null && reason.trim().isNotEmpty)
-              'reason': reason.trim(),
-          },
-        ),
-      );
+  Future<Approval> reject(String id, {String? reason}) => _object(
+    'POST',
+    '/api/v1/approvals/$id/reject',
+    Approval.fromJson,
+    body: {
+      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+    },
+  );
 
   /// Runs an approved action with its exact stored parameters. Safe to repeat:
   /// the server returns the stored outcome with `replayed: true`.
-  Future<ToolExecution> execute(Approval approval) async =>
-      ToolExecution.fromJson(
-        await _object(
-          'POST',
-          '/api/v1/approvals/${approval.id}/execute',
-          body: {'arguments': approval.arguments},
-          timeout: turnTimeout,
-        ),
-      );
+  Future<ToolExecution> execute(Approval approval) => _object(
+    'POST',
+    '/api/v1/approvals/${approval.id}/execute',
+    ToolExecution.fromJson,
+    body: {'arguments': approval.arguments},
+    timeout: turnTimeout,
+  );
 
   // ----- Transport -----------------------------------------------------------
 
-  Future<Map<String, dynamic>> _object(
+  Future<T> _object<T>(
     String method,
-    String path, {
+    String path,
+    T Function(Map<String, dynamic> json) parse, {
     Object? body,
     Duration timeout = readTimeout,
   }) async {
     final decoded = await _send(method, path, body: body, timeout: timeout);
-    if (decoded is Map) return Map<String, dynamic>.from(decoded);
-    throw const ApiError(
-      ApiErrorKind.badResponse,
-      'Réponse inattendue du serveur.',
+    return _parse(
+      method,
+      () => parse(Map<String, dynamic>.from(decoded as Map)),
     );
   }
 
-  Future<List<Map<String, dynamic>>> _list(String method, String path) async {
-    final decoded = await _send(method, path);
-    if (decoded is List) {
+  Future<List<T>> _list<T>(
+    String path,
+    T Function(Map<String, dynamic> json) parse,
+  ) async {
+    final decoded = await _send('GET', path);
+    return _parse('GET', () {
       return [
-        for (final item in decoded) Map<String, dynamic>.from(item as Map),
+        for (final item in decoded as List)
+          parse(Map<String, dynamic>.from(item as Map)),
       ];
-    }
-    throw const ApiError(
-      ApiErrorKind.badResponse,
-      'Réponse inattendue du serveur.',
-    );
+    });
   }
+
+  /// Any response outside the documented contract (wrong type, missing field,
+  /// `null` item, bad date) becomes a readable [ApiError], never a raw TypeError.
+  /// For a write, the server answered 2xx: the request was probably processed.
+  static T _parse<T>(String method, T Function() build) {
+    try {
+      return build();
+    } on Object {
+      throw _badResponse(method);
+    }
+  }
+
+  static ApiError _badResponse(String method) => method == 'GET'
+      ? const ApiError(
+          ApiErrorKind.badResponse,
+          'Réponse inattendue du serveur.',
+        )
+      : const ApiError(
+          ApiErrorKind.badResponse,
+          'Réponse inattendue du serveur : la demande a peut-être été traitée.',
+          maybeProcessed: true,
+        );
 
   Future<Object?> _send(
     String method,
@@ -217,7 +228,7 @@ class NexoraApi {
     } on http.ClientException catch (error) {
       throw _transportError(error.message, method);
     }
-    return _decode(response);
+    return _decode(response, method);
   }
 
   static ApiError _transportError(String detail, String method) {
@@ -243,7 +254,7 @@ class NexoraApi {
   static const _tlsMessage =
       'Certificat HTTPS refusé. La connexion a été bloquée pour votre sécurité.';
 
-  static Object? _decode(http.Response response) {
+  static Object? _decode(http.Response response, String method) {
     final text = utf8.decode(response.bodyBytes, allowMalformed: true);
     Object? decoded;
     try {
@@ -252,12 +263,7 @@ class NexoraApi {
       decoded = null;
     }
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (decoded == null && text.isNotEmpty) {
-        throw const ApiError(
-          ApiErrorKind.badResponse,
-          'Réponse illisible du serveur.',
-        );
-      }
+      if (decoded == null && text.isNotEmpty) throw _badResponse(method);
       return decoded;
     }
     throw errorFromResponse(response.statusCode, decoded);
@@ -270,8 +276,10 @@ class NexoraApi {
     String? serverMessage;
     var stored = const <ChatMessage>[];
     if (detail is Map) {
-      code = detail['code'] as String?;
-      serverMessage = detail['message'] as String?;
+      code = detail['code'] is String ? detail['code'] as String : null;
+      serverMessage = detail['message'] is String
+          ? detail['message'] as String
+          : null;
       final messages = detail['messages'];
       if (messages is List) {
         try {

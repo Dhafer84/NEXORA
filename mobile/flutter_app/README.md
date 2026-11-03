@@ -15,6 +15,8 @@ et sombre, heures affichées dans le fuseau du téléphone.
    injoignable, certificat refusé et clé refusée.
 4. **Enregistrer**. La clé n’est plus jamais affichée ; elle peut être remplacée
    (nouveau champ) ou supprimée de ce téléphone (elle reste valable côté serveur).
+   Elle est liée à l’adresse saisie : changer d’adresse exige la clé de la
+   nouvelle adresse, l’ancienne n’est jamais envoyée ailleurs.
 
 Onglets :
 
@@ -60,6 +62,8 @@ réouverture.
 - Aucune clé de fournisseur IA dans l’application ; aucune adresse de serveur
   imposée par défaut.
 - Redirections HTTP non suivies (la clé ne part jamais vers une autre adresse).
+- Toute réponse hors contrat devient une erreur lisible ; après un envoi ou une
+  exécution, elle est traitée comme une issue incertaine (aucun renvoi).
 
 ## Architecture
 

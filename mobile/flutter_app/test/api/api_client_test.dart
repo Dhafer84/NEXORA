@@ -188,6 +188,51 @@ void main() {
       expect(conflict.code, 'approval_rejected');
     });
 
+    test(
+      'JSON valide mais hors contrat : erreur lisible, jamais TypeError',
+      () async {
+        final cases = <String, Future<Object?> Function(NexoraApi api)>{
+          'liste avec null': (api) => api.approvals(),
+          'champ manquant': (api) => api.metrics(),
+          'date illisible': (api) => api.conversation('c1'),
+        };
+        final bodies = {
+          'liste avec null': [null],
+          'champ manquant': {'scope': 'host'},
+          'date illisible': {
+            'id': 'c1',
+            'title': 't',
+            'status': 'active',
+            'created_at': 'hier',
+            'updated_at': 'hier',
+            'messages': [],
+          },
+        };
+        for (final name in cases.keys) {
+          final api = apiWith((_) async => jsonResponse(bodies[name]));
+          final error = await failure(cases[name]!(api));
+          expect(error.kind, ApiErrorKind.badResponse, reason: name);
+          expect(error.message, 'Réponse inattendue du serveur.', reason: name);
+          expect(error.outcomeUnknown, isFalse, reason: name);
+        }
+      },
+    );
+
+    test('écriture avec réponse hors contrat : issue incertaine', () async {
+      final api = apiWith((_) async => jsonResponse({'status': 'completed'}));
+      final error = await failure(api.sendMessage('c1', 'x'));
+      expect(error.kind, ApiErrorKind.badResponse);
+      expect(error.outcomeUnknown, isTrue);
+      expect(error.message, contains('peut-être été traitée'));
+    });
+
+    test('code d’erreur de type inattendu ignoré', () {
+      final error = NexoraApi.errorFromResponse(409, {
+        'detail': {'code': 42, 'message': null},
+      });
+      expect((error.kind, error.code), (ApiErrorKind.conflict, null));
+    });
+
     test('réponse non JSON ou mauvais format', () async {
       final html = apiWith((_) async => http.Response('<html>', 200));
       expect((await failure(html.metrics())).kind, ApiErrorKind.badResponse);

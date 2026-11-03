@@ -34,6 +34,7 @@ class ApiError implements Exception {
     this.statusCode,
     this.code,
     this.messages = const [],
+    this.maybeProcessed = false,
   });
 
   final ApiErrorKind kind;
@@ -46,9 +47,14 @@ class ApiError implements Exception {
   /// Messages already stored by the server (AI provider failure, HTTP 503).
   final List<ChatMessage> messages;
 
-  /// True when a write may have been applied although no answer was received.
+  /// Set for a write answered 2xx with an unreadable body.
+  final bool maybeProcessed;
+
+  /// True when a write may have been applied although no usable answer was received.
   bool get outcomeUnknown =>
-      kind == ApiErrorKind.timeout || kind == ApiErrorKind.interrupted;
+      maybeProcessed ||
+      kind == ApiErrorKind.timeout ||
+      kind == ApiErrorKind.interrupted;
 
   @override
   String toString() => 'ApiError($kind, ${statusCode ?? '-'}, ${code ?? '-'})';

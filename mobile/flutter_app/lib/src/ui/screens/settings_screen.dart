@@ -39,19 +39,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
-  String? _keyForTest(AppState state) {
-    if (_key.text.isNotEmpty) return _key.text;
-    return null;
-  }
-
   Future<void> _test() async {
     if (!_form.currentState!.validate()) return;
     final state = AppScope.read(context);
-    final key = _keyForTest(state) ?? (await state.store.read())?.apiKey;
+    final typed = _key.text.trim();
+    // The stored key is only ever tested against its own address.
+    final key = typed.isNotEmpty ? typed : await state.storedKeyFor(_url.text);
     if (key == null) {
       setState(
-        () => _report = const ConnectionReport.failure(
-          'Saisissez la clé personnelle.',
+        () => _report = ConnectionReport.failure(
+          state.hasKey
+              ? AppState.newAddressNeedsKey
+              : 'Saisissez la clé personnelle.',
         ),
       );
       return;
@@ -72,7 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _save() async {
     if (!_form.currentState!.validate()) return;
     final state = AppScope.read(context);
-    if (!state.hasKey && _key.text.isEmpty) {
+    if (!state.hasKey && _key.text.trim().isEmpty) {
       setState(
         () => _report = const ConnectionReport.failure(
           'Saisissez la clé personnelle.',
@@ -81,9 +80,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
     setState(() => _busy = true);
-    await state.save(_url.text, _key.text.isEmpty ? null : _key.text.trim());
-    _key.clear();
+    final problem = await state.save(_url.text, _key.text);
     if (!mounted) return;
+    if (problem != null) {
+      setState(() {
+        _busy = false;
+        _report = ConnectionReport.failure(problem);
+      });
+      return;
+    }
+    _key.clear();
     setState(() => _busy = false);
     ScaffoldMessenger.of(
       context,
@@ -185,7 +191,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       : 'Clé personnelle',
                   helperMaxLines: 3,
                   helperText: state.hasKey
-                      ? 'Une clé est enregistrée. Laissez vide pour la conserver.'
+                      ? 'Une clé est enregistrée pour cette adresse. Laissez vide '
+                            'pour la conserver ; une nouvelle adresse exige sa clé.'
                       : 'La clé est conservée dans le stockage sécurisé Android.',
                   prefixIcon: const Icon(Icons.key_outlined),
                   suffixIcon: IconButton(

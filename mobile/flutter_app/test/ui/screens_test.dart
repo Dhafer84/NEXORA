@@ -51,6 +51,26 @@ void main() {
       expect(find.text(testApiKey), findsNothing);
     });
 
+    testApp('changer d’adresse exige la clé de la nouvelle adresse', (
+      tester,
+    ) async {
+      final backend = FakeBackend();
+      final state = await pumpApp(tester, backend);
+      await tapText(tester, 'Réglages');
+      backend.requests.clear();
+      final fields = find.byType(TextFormField);
+      await tester.enterText(fields.at(0), 'https://autre.test:8101');
+      await tapText(tester, 'Tester la connexion');
+      expect(textHas('n’est jamais envoyée à une autre'), findsOneWidget);
+      await tapText(tester, 'Enregistrer');
+      expect(state.baseUrl, testBaseUrl);
+      expect(
+        backend.requests.where((r) => r.url.host == 'autre.test'),
+        isEmpty,
+        reason: 'l’ancienne clé ne part jamais vers la nouvelle adresse',
+      );
+    });
+
     testApp('supprimer la clé demande confirmation', (tester) async {
       final backend = FakeBackend();
       final state = await pumpApp(tester, backend);

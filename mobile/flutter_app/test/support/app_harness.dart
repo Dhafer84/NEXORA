@@ -38,7 +38,11 @@ Future<AppState> pumpApp(
   await initializeDateFormatting('fr_FR');
   FlutterSecureStorage.setMockInitialValues(
     configured
-        ? {'nexora.base_url': testBaseUrl, 'nexora.api_key': backend.apiKey}
+        ? {
+            'nexora.base_url': testBaseUrl,
+            'nexora.api_key': backend.apiKey,
+            'nexora.api_key_url': testBaseUrl,
+          }
         : {},
   );
   final state = AppState(

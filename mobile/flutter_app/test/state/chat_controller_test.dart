@@ -140,6 +140,17 @@ void main() {
     },
   );
 
+  test(
+    'réponse mal formée après envoi : incertaine, pas de brouillon',
+    () async {
+      backend.override = (request) => request.method == 'POST'
+          ? jsonResponse({'status': 'completed', 'messages': null})
+          : null;
+      expect(await chat.send('question'), SendOutcome.uncertain);
+      expect(chat.banner?.message, contains('pas renvoyé automatiquement'));
+    },
+  );
+
   test('erreur de chargement exposée', () async {
     final missing = ChatController(api: backend.api(), conversationId: 'x');
     await missing.reload();

@@ -84,17 +84,37 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  /// Saves the address and, when given, a new key. An empty [newKey] keeps the stored one.
-  Future<void> save(String url, String? newKey) async {
-    await store.saveBaseUrl(normalizeBaseUrl(url));
-    if (newKey != null && newKey.isNotEmpty) await store.saveApiKey(newKey);
-    await load();
+  /// True when [url] is the address the stored key was entered for.
+  bool keyBelongsTo(String url) =>
+      hasKey && baseUrl != null && normalizeBaseUrl(url) == baseUrl;
+
+  /// The stored key, only for the address it belongs to; never for another one.
+  Future<String?> storedKeyFor(String url) async {
+    if (!keyBelongsTo(url)) return null;
+    return (await store.read())?.apiKey;
   }
 
+  /// Saves the address and, when given, a new key. Without [newKey] the stored
+  /// key is kept only for the same address: a new address requires its key.
+  /// Returns a message when nothing was saved.
+  Future<String?> save(String url, String? newKey) async {
+    final key = newKey?.trim() ?? '';
+    if (key.isEmpty && !keyBelongsTo(url)) return newAddressNeedsKey;
+    await store.save(normalizeBaseUrl(url), apiKey: key.isEmpty ? null : key);
+    await load();
+    return null;
+  }
+
+  static const newAddressNeedsKey =
+      'Saisissez la clé personnelle de ce serveur : la clé enregistrée reste '
+      'liée à l’adresse précédente et n’est jamais envoyée à une autre.';
+
   Future<void> deleteKey() async {
-    await store.deleteApiKey();
+    // Drop the client first: no request may use the key while it is deleted.
     _stopPolling();
+    _replaceApi(null);
     pendingApprovals = null;
+    await store.deleteApiKey();
     await load();
   }
 
@@ -103,9 +123,12 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     if (api == null) return;
     try {
       final pending = await api.approvals(status: 'pending', limit: 100);
+      // Ignore an answer that arrives after the address or key changed.
+      if (!identical(api, _api)) return;
       pendingApprovals = pending.length;
       pendingError = null;
     } on ApiError catch (error) {
+      if (!identical(api, _api)) return;
       pendingError = error.message;
     }
     _notify();
