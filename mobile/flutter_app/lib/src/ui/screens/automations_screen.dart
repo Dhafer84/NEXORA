@@ -349,7 +349,7 @@ class _PhoneAlertsCardState extends State<PhoneAlertsCard> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: Text(
-                'Le délai peut atteindre 15 à 30 minutes, davantage en économie '
+                'L’alerte arrive en général 15 à 45 minutes après la mesure, davantage en économie '
                 'd’énergie. Tailscale doit rester connecté. Sur Huawei, réglez '
                 'NEXORA en « Gestion manuelle » dans Lancement des applications. '
                 'Un arrêt forcé de NEXORA suspend les alertes jusqu’à sa réouverture.',

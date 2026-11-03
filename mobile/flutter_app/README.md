@@ -62,7 +62,7 @@ est fermée n’est vue qu’à sa réouverture.
 - **Alertes sur ce téléphone** : un travail Android (WorkManager) interroge le
   serveur environ toutes les 15 minutes, même application fermée et après un
   redémarrage du téléphone, et affiche les nouvelles notifications (seuil atteint,
-  retour sous le seuil, mesure impossible). Délai réel : 15 à 30 minutes, plus en
+  retour sous le seuil, mesure impossible). Délai réel : 15 à 45 minutes (Android regroupe les tâches réseau), plus en
   économie d’énergie ; Tailscale doit rester connecté ; un **arrêt forcé** de
   l’application suspend les alertes jusqu’à sa réouverture. Sur Huawei, régler
   NEXORA en « Gestion manuelle » dans *Lancement des applications*. Android 13 et
