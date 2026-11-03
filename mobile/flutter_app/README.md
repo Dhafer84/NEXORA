@@ -145,7 +145,8 @@ résultat GitHub Actions, issues ouvertes, dernier commit. Lecture seule.
 - Pas : total des entrées de **Health Sync** (paquet `nl.appyhapps.healthsync`,
   à confirmer sur l’appareil), total Health Connect (doublons retirés selon la
   priorité des applications), somme brute, détail par application et appareil
-  (paquet, nombre d’entrées, heures) et **avertissement de chevauchement** quand
+  (paquet, nombre d’entrées, heures ; appareil et modèle seulement s’ils figurent
+  dans l’entrée, sinon « Health Sync » seul) et **avertissement de chevauchement** quand
   deux sources couvrent la même période (pour ne pas additionner la montre et le
   téléphone).
 - *Historique accessible* : date de la plus ancienne entrée lisible.

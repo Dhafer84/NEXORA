@@ -2,7 +2,8 @@ import 'health_service.dart';
 
 /// Where an entry comes from, to avoid counting the same steps twice.
 enum SourceKind {
-  /// Written by Health Sync (the watch data transferred from Huawei Health).
+  /// Written by Health Sync. That names the transferring app only: the
+  /// device is known only when the entry's metadata gives it.
   healthSync,
 
   /// Measured by the phone itself (its step counter, whatever the app).

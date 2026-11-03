@@ -279,6 +279,40 @@ void main() {
       expect(find.text('Données lues'), findsNWidgets(2));
     });
 
+    testWidgets('Health Sync sans appareil connu : ni montre ni modèle', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        FakeHealth(
+          granted: {HealthCategory.steps},
+          entries: {
+            HealthCategory.steps: [
+              _steps(healthSyncPackage, 2, 8, 9, 500),
+              _steps(
+                healthSyncPackage,
+                2,
+                10,
+                11,
+                700,
+                deviceType: 1,
+                model: 'WATCH GT 5 Pro',
+              ),
+            ],
+          },
+        ),
+      );
+      await _tap(tester, find.text('Lire la journée'));
+      // The entry without metadata: the app only.
+      expect(find.text('Health Sync'), findsOneWidget);
+      expect(
+        find.text('Health Sync — montre · HUAWEI WATCH GT 5 Pro'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('via Huawei Health'), findsNothing);
+      expect(find.textContaining('Health Sync · 1 entrée'), findsNWidgets(2));
+    });
+
     testWidgets('historique accessible', (tester) async {
       await _pump(
         tester,

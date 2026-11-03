@@ -516,7 +516,9 @@ class _Sources extends StatelessWidget {
   }
 
   static String _kind(SourceKind kind) => switch (kind) {
-    SourceKind.healthSync => 'Health Sync (montre via Huawei Health)',
+    // The app that wrote the entry; the device is named only by the entry's
+    // own metadata (see SourceGroup.label).
+    SourceKind.healthSync => 'Health Sync',
     SourceKind.phone => 'Téléphone',
     SourceKind.nexora => 'Essai NEXORA',
     SourceKind.otherApp => 'Autre application',
