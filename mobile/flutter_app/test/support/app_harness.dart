@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,9 +41,10 @@ Future<AppState> pumpApp(
   FlutterSecureStorage.setMockInitialValues(
     configured
         ? {
-            'nexora.base_url': testBaseUrl,
-            'nexora.api_key': backend.apiKey,
-            'nexora.api_key_url': testBaseUrl,
+            SecureCredentialsStore.entryKey: jsonEncode({
+              'base_url': testBaseUrl,
+              'api_key': backend.apiKey,
+            }),
           }
         : {},
   );

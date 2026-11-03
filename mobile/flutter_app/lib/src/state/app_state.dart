@@ -100,10 +100,20 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   Future<String?> save(String url, String? newKey) async {
     final key = newKey?.trim() ?? '';
     if (key.isEmpty && !keyBelongsTo(url)) return newAddressNeedsKey;
-    await store.save(normalizeBaseUrl(url), apiKey: key.isEmpty ? null : key);
+    try {
+      await store.save(normalizeBaseUrl(url), apiKey: key.isEmpty ? null : key);
+    } on Object {
+      // Single-entry write: the stored pair is still the previous one.
+      await load();
+      return saveFailed;
+    }
     await load();
     return null;
   }
+
+  static const saveFailed =
+      'Enregistrement impossible : les réglages précédents sont conservés. '
+      'Réessayez.';
 
   static const newAddressNeedsKey =
       'Saisissez la clé personnelle de ce serveur : la clé enregistrée reste '
@@ -114,8 +124,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _stopPolling();
     _replaceApi(null);
     pendingApprovals = null;
-    await store.deleteApiKey();
-    await load();
+    try {
+      await store.deleteApiKey();
+    } finally {
+      await load();
+    }
   }
 
   Future<void> refreshPending() async {

@@ -53,6 +53,9 @@ réouverture.
 
 ## Sécurité
 
+- Adresse et clé enregistrées ensemble dans une seule entrée du stockage sécurisé,
+  en une écriture : une interruption laisse l’ancienne paire ou la nouvelle,
+  jamais une clé associée à une autre adresse.
 - Clé personnelle dans le stockage sécurisé Android (Keystore), jamais dans les
   journaux, les URL ni les sauvegardes (`allowBackup=false`, règles d’extraction
   vides).

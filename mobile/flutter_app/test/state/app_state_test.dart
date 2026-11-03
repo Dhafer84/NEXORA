@@ -5,6 +5,7 @@ import 'package:nexora/src/state/app_state.dart';
 import 'package:nexora/src/storage/credentials_store.dart';
 
 import '../support/fake_backend.dart';
+import '../support/memory_vault.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -117,6 +118,84 @@ void main() {
       expect(await state.save('$testBaseUrl/', null), isNull);
       expect(await state.storedKeyFor(testBaseUrl), testApiKey);
     });
+  });
+
+  group('interruption pendant le changement de serveur', () {
+    const other = 'https://autre.test:8101';
+    late MemoryVault vault;
+
+    AppState start() => AppState(
+      store: SecureCredentialsStore(vault),
+      apiFactory: backend.factory,
+    );
+
+    Set<String> hostsUsingKey(String key) => {
+      for (final request in backend.requests)
+        if (request.headers['Authorization'] == 'Bearer $key') request.url.host,
+    };
+
+    setUp(() async {
+      vault = MemoryVault();
+      final first = start();
+      await first.save(testBaseUrl, testApiKey);
+      first.dispose();
+      vault.operations = 0;
+      backend.requests.clear();
+    });
+
+    test('écriture interrompue : message, anciens réglages gardés', () async {
+      final app = start();
+      await app.load();
+      vault.interruptAt = 1;
+      expect(await app.save(other, 'cle-de-l-autre'), AppState.saveFailed);
+      expect(app.baseUrl, testBaseUrl);
+      expect(await app.storedKeyFor(testBaseUrl), testApiKey);
+      await app.refreshPending();
+      app.dispose();
+
+      // The phone restarts the app: same storage, same old pair.
+      final restarted = start();
+      await restarted.load();
+      expect(restarted.baseUrl, testBaseUrl);
+      await restarted.refreshPending();
+      restarted.dispose();
+      expect(hostsUsingKey(testApiKey), {'nexora.test'});
+      expect(hostsUsingKey('cle-de-l-autre'), isEmpty);
+    });
+
+    test(
+      'application arrêtée juste après l’écriture : nouvelle paire',
+      () async {
+        final app = start();
+        await app.load();
+        vault.interruptAt = 2; // after the single entry, during legacy cleanup
+        expect(await app.save(other, 'cle-de-l-autre'), isNull);
+        expect(app.baseUrl, other);
+        app.dispose();
+
+        final restarted = start();
+        await restarted.load();
+        expect(restarted.baseUrl, other);
+        expect(await restarted.storedKeyFor(other), 'cle-de-l-autre');
+        await restarted.refreshPending();
+        restarted.dispose();
+        expect(hostsUsingKey(testApiKey).contains('autre.test'), isFalse);
+        expect(hostsUsingKey('cle-de-l-autre'), {'autre.test'});
+      },
+    );
+
+    test(
+      'suppression de la clé interrompue : clé toujours utilisable',
+      () async {
+        final app = start();
+        await app.load();
+        vault.interruptAt = 1;
+        await expectLater(app.deleteKey(), throwsA(isA<Interrupted>()));
+        expect(app.hasKey, isTrue);
+        expect(app.configured, isTrue);
+        app.dispose();
+      },
+    );
   });
 
   test('erreur de rafraîchissement conservée sans planter', () async {

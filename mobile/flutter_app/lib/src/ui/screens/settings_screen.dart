@@ -118,11 +118,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    await AppScope.read(context).deleteKey();
+    final state = AppScope.read(context);
+    var deleted = true;
+    try {
+      await state.deleteKey();
+    } on Object {
+      deleted = false;
+    }
     if (!mounted) return;
     setState(() => _report = null);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Clé supprimée de ce téléphone.')),
+      SnackBar(
+        content: Text(
+          deleted
+              ? 'Clé supprimée de ce téléphone.'
+              : 'Suppression impossible : la clé est toujours enregistrée. Réessayez.',
+        ),
+      ),
     );
   }
 
