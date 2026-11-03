@@ -47,9 +47,47 @@ l’historique est rechargé.
 ### Indicateur de validations
 
 Le badge est mis à jour à l’ouverture de l’application puis toutes les 30 s tant
-qu’elle est au premier plan. Il n’y a **pas de notification push** : une
-validation demandée pendant que l’application est fermée n’est vue qu’à sa
-réouverture.
+qu’elle est au premier plan. Une validation demandée pendant que l’application
+est fermée n’est vue qu’à sa réouverture.
+
+### Automatisations (onglet « Tâches »)
+
+- Créer, modifier, suspendre, reprendre ou supprimer une vérification de l’espace
+  disque du serveur : seuil d’alerte (un seuil de 1 % sert d’essai), fréquence
+  (15 min à 24 h). Le fuseau horaire est celui du téléphone ; la prochaine
+  vérification est affichée à l’heure locale.
+- « Vérifier maintenant » lance une mesure immédiate et affiche son résultat ;
+  l’historique montre chaque exécution (heure, valeur, seuil, résultat, échec,
+  notification envoyée, créneaux manqués pendant un arrêt du serveur).
+- **Alertes sur ce téléphone** : un travail Android (WorkManager) interroge le
+  serveur environ toutes les 15 minutes, même application fermée et après un
+  redémarrage du téléphone, et affiche les nouvelles notifications (seuil atteint,
+  retour sous le seuil, mesure impossible). Délai réel : 15 à 30 minutes, plus en
+  économie d’énergie ; Tailscale doit rester connecté ; un **arrêt forcé** de
+  l’application suspend les alertes jusqu’à sa réouverture. Sur Huawei, régler
+  NEXORA en « Gestion manuelle » dans *Lancement des applications*. Android 13 et
+  plus demandent l’autorisation des notifications ; un refus est expliqué.
+- Pas de notification « push » instantanée : voir les questions de T04 (ntfy).
+
+### Projets GitHub (onglet « Serveur »)
+
+État des dépôts autorisés sur le serveur (`NEXORA_GITHUB_REPOS`) : dernier
+résultat GitHub Actions, issues ouvertes, dernier commit. Lecture seule.
+
+### Classement des fichiers (depuis « Tâches »)
+
+- NEXORA n’accède qu’à **un dossier choisi** dans le sélecteur Android (Storage
+  Access Framework), sans permission de stockage générale ; l’accès peut être
+  retiré dans l’écran.
+- Propositions calculées sur le téléphone, sans serveur ni IA : rangement par
+  type dans des sous-dossiers (Documents, Tableurs, Présentations, Images,
+  Vidéos, Audio, Archives, Applications) et noms lisibles pour les photos et
+  captures.
+- **Chaque** déplacement ou renommage s’effectue seulement après sa propre
+  confirmation, qui affiche le fichier et la destination (le nouveau nom peut être
+  modifié). Rien n’est supprimé, copié ni remplacé : un nom déjà pris ou un
+  stockage qui refuse le déplacement donne une erreur sans modification. Chaque
+  résultat est rapporté dans « Opérations effectuées ».
 
 ## Sécurité
 
@@ -74,12 +112,15 @@ réouverture.
 | --- | --- |
 | `lib/src/api/` | Client HTTP unique, modèles typés, erreurs centralisées (`ApiError`) et délais : 15 s pour les lectures, 150 s pour un tour IA ou une exécution. |
 | `lib/src/storage/` | Stockage des identifiants (`flutter_secure_storage`). |
+| `lib/src/alerts/` | Alertes en arrière-plan : curseur des notifications du serveur, travail WorkManager, notifications locales. |
+| `lib/src/files/` | Classement des fichiers : accès au dossier choisi (canal vers `MainActivity.kt`), règles de proposition. |
 | `lib/src/state/` | État de l’application (`AppState`, badge) et d’une conversation (`ChatController`, garde contre le double envoi). |
 | `lib/src/ui/` | Écrans, thème, formats français. |
 | `test/` | Tests unitaires et d’écrans ; `test/support/fake_backend.dart` imite le backend en mémoire. |
 
 Dépendances figées (`pubspec.lock`) : `http`, `flutter_secure_storage`, `intl`,
-`flutter_localizations`. Gestion d’état : `ChangeNotifier` et `InheritedNotifier`,
+`flutter_localizations`, `workmanager`, `flutter_local_notifications`,
+`flutter_timezone`, `shared_preferences`. Gestion d’état : `ChangeNotifier` et `InheritedNotifier`,
 sans bibliothèque supplémentaire.
 
 ## Développement

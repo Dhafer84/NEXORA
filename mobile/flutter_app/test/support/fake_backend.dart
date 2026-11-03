@@ -34,6 +34,52 @@ class FakeBackend {
   final Map<String, Map<String, dynamic>> conversations = {};
   final Map<String, List<Map<String, dynamic>>> messages = {};
   final Map<String, Map<String, dynamic>> approvals = {};
+  final Map<String, Map<String, dynamic>> automations = {};
+  final Map<String, List<Map<String, dynamic>>> runs = {};
+  final List<Map<String, dynamic>> notifications = [];
+
+  Map<String, dynamic> github = {
+    'configured': true,
+    'authenticated': false,
+    'repos': [
+      {
+        'repo': 'Dhafer84/NEXORA',
+        'available': true,
+        'error': null,
+        'open_issues': 2,
+        'commits': [
+          {
+            'sha': 'e4b3965',
+            'message': 'Enregistre l’adresse et la clé ensemble',
+            'author': 'Dhafer',
+            'date': '2026-11-02T09:00:00Z',
+          },
+        ],
+        'issues': [],
+        'workflow_runs': [
+          {
+            'name': 'Mobile checks',
+            'branch': 'main',
+            'status': 'completed',
+            'conclusion': 'failure',
+            'created_at': '2026-11-02T09:01:00Z',
+          },
+        ],
+      },
+      {
+        'repo': 'Dhafer84/assistant',
+        'available': false,
+        'error': 'Dépôt introuvable, ou privé sans jeton d’accès',
+        'open_issues': null,
+        'commits': [],
+        'issues': [],
+        'workflow_runs': [],
+      },
+    ],
+  };
+
+  /// Disk usage returned by a manual check; an exception value makes it fail.
+  double? diskPercent = 42.5;
 
   /// Paths (without query) answered with 403 permission_denied.
   final Set<String> forbidden = {};
@@ -123,6 +169,81 @@ class FakeBackend {
     };
     approvals[id] = approval;
     return approval;
+  }
+
+  Map<String, dynamic> addAutomation({
+    String name = 'Vérification du disque',
+    double threshold = 85,
+    int interval = 60,
+    bool enabled = true,
+  }) {
+    final id = _id('auto');
+    final automation = {
+      'id': id,
+      'name': name,
+      'kind': 'disk_check',
+      'threshold_percent': threshold,
+      'interval_minutes': interval,
+      'timezone': 'Europe/Paris',
+      'enabled': enabled,
+      // 10:00 UTC = 11:00 in Paris, as the backend sends it.
+      'next_run_at': enabled ? '2026-11-02T11:00:00+01:00' : null,
+      'alert_active': false,
+      'failing': false,
+      'last_run': null,
+      'created_at': _date(),
+      'updated_at': _date(),
+    };
+    automations[id] = automation;
+    runs[id] = [];
+    return automation;
+  }
+
+  Map<String, dynamic> addNotification(String title, {String level = 'alert'}) {
+    final notification = {
+      'id': notifications.length + 1,
+      'created_at': _date(),
+      'level': level,
+      'title': title,
+      'body': 'Détail de « $title »',
+      'automation_id': null,
+      'run_id': null,
+    };
+    notifications.add(notification);
+    return notification;
+  }
+
+  /// Same anti-repeat rule as the backend, for manual checks.
+  Map<String, dynamic> _check(Map<String, dynamic> automation) {
+    final threshold = automation['threshold_percent'] as double;
+    final value = diskPercent;
+    final alert = value != null && value >= threshold;
+    final notify = value == null
+        ? !(automation['failing'] as bool)
+        : alert != automation['alert_active'];
+    final run = {
+      'id': _id('run'),
+      'automation_id': automation['id'],
+      'trigger': 'manual',
+      'scheduled_for': null,
+      'missed_slots': 0,
+      'started_at': _date(Duration(minutes: _ids)),
+      'finished_at': _date(Duration(minutes: _ids)),
+      'status': value == null ? 'failed' : (alert ? 'alert' : 'ok'),
+      'measured_percent': value,
+      'threshold_percent': threshold,
+      'error_code': value == null ? 'metrics_unavailable' : null,
+      'message': value == null
+          ? 'Mesure du disque impossible'
+          : 'Disque utilisé à ${value.toStringAsFixed(1).replaceAll('.', ',')} %',
+      'notified': notify,
+    };
+    if (value != null) automation['alert_active'] = alert;
+    automation['failing'] = value == null;
+    automation['last_run'] = run;
+    runs[automation['id']]!.insert(0, run);
+    if (notify) addNotification(run['message'] as String);
+    return run;
   }
 
   Map<String, dynamic> get metrics => {
@@ -215,6 +336,62 @@ class FakeBackend {
           return errorResponse(404, 'approval_not_found', 'Introuvable');
         }
         return _decide(approval, action, body);
+      case ('GET', ['api', 'v1', 'github']):
+        return jsonResponse(github);
+      case ('GET', ['api', 'v1', 'automations']):
+        return jsonResponse(automations.values.toList());
+      case ('POST', ['api', 'v1', 'automations']):
+        final created = addAutomation(
+          name: body['name'] as String,
+          threshold: (body['threshold_percent'] as num).toDouble(),
+          interval: body['interval_minutes'] as int,
+          enabled: body['enabled'] as bool,
+        );
+        created['timezone'] = body['timezone'];
+        return jsonResponse(created, 201);
+      case ('GET', ['api', 'v1', 'notifications']):
+        final after = int.parse(request.url.queryParameters['after_id'] ?? '0');
+        final limit = int.parse(request.url.queryParameters['limit'] ?? '20');
+        return jsonResponse({
+          'items': notifications
+              .where((n) => (n['id'] as int) > after)
+              .take(limit)
+              .toList(),
+          'latest_id': notifications.length,
+        });
+    }
+    if (segments.length >= 4 &&
+        segments.sublist(0, 3).join('/') == 'api/v1/automations') {
+      final automation = automations[segments[3]];
+      if (automation == null) {
+        return errorResponse(
+          404,
+          'automation_not_found',
+          'Automatisation introuvable',
+        );
+      }
+      switch ((method, segments.sublist(4))) {
+        case ('GET', []):
+          return jsonResponse(automation);
+        case ('PATCH', []):
+          automation.addAll(body);
+          if (body.containsKey('threshold_percent')) {
+            automation['threshold_percent'] = (body['threshold_percent'] as num)
+                .toDouble();
+            automation['alert_active'] = false;
+          }
+          automation['next_run_at'] = automation['enabled'] as bool
+              ? '2026-11-02T11:00:00+01:00'
+              : null;
+          return jsonResponse(automation);
+        case ('DELETE', []):
+          automations.remove(segments[3]);
+          return http.Response('', 204);
+        case ('POST', ['run']):
+          return jsonResponse(_check(automation));
+        case ('GET', ['runs']):
+          return jsonResponse(runs[segments[3]]);
+      }
     }
     return errorResponse(404, 'not_found', 'Route inconnue');
   }

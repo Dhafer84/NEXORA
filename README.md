@@ -38,6 +38,9 @@ configuration complémentaire décrit dans le [guide de déploiement](docs/DEPLO
 | `/api/v1/approvals…` | Clé Bearer | Consultation, approbation, refus et exécution unique |
 | `/api/v1/conversations…` | Clé Bearer | Conversations, messages et historique |
 | `GET /api/v1/ai/status` | Clé Bearer | Fournisseur IA sélectionné et configuration |
+| `/api/v1/automations…` | Clé + `automation:read` / `automation:write` | Tâches planifiées (vérification du disque), exécution manuelle, historique |
+| `GET /api/v1/notifications` | Clé + `notifications:read` | Alertes produites par les tâches, lues par le téléphone |
+| `GET /api/v1/github` | Clé + `github:read` | Rapport en lecture seule des dépôts autorisés |
 
 Détails, codes d’erreur, limites et exemples : [docs/API.md](docs/API.md).
 

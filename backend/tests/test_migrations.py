@@ -13,12 +13,16 @@ def tables(settings):
 
 def test_migrations_apply_once_and_roll_back(db_settings):
     expected = {"conversations", "messages", "tool_executions", "approval_requests"}
-    assert expected <= tables(db_settings)
-    assert migrate.current_version(db_settings) == 1
+    automation = {"automations", "automation_runs", "notifications"}
+    assert expected | automation <= tables(db_settings)
+    assert migrate.current_version(db_settings) == 2
     assert migrate.upgrade(db_settings) == []
+    # Rolling back 0002 alone keeps the conversations of 0001.
+    assert migrate.downgrade(db_settings, 1) == [2]
+    assert expected <= tables(db_settings) and not automation & tables(db_settings)
     assert migrate.downgrade(db_settings, 0) == [1]
-    assert not expected & tables(db_settings)
-    assert migrate.upgrade(db_settings) == [1]
+    assert not (expected | automation) & tables(db_settings)
+    assert migrate.upgrade(db_settings) == [1, 2]
 
 
 def test_modified_applied_migration_is_detected(db_settings):

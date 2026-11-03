@@ -26,6 +26,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final _ready = _Probe<bool>();
   final _metrics = _Probe<ServerMetrics>();
   final _ai = _Probe<AiStatus>();
+  final _github = _Probe<GitHubReport>();
   DateTime? _checkedAt;
 
   @override
@@ -65,6 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }),
       _probe(_metrics, api.metrics),
       _probe(_ai, api.aiStatus),
+      _probe(_github, api.github),
     ]);
     if (mounted) setState(() => _checkedAt = DateTime.now());
   }
@@ -146,6 +148,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               loading: _ai.loading && _ai.value == null,
               error: _ai.error,
               child: _ai.value == null ? null : _AiDetails(status: _ai.value!),
+            ),
+            const SizedBox(height: 8),
+            _Section(
+              title: 'Projets GitHub',
+              icon: Icons.code,
+              loading: _github.loading && _github.value == null,
+              error: _github.error,
+              child: _github.value == null
+                  ? null
+                  : _GitHubDetails(report: _github.value!),
             ),
             if (_checkedAt != null)
               Padding(
@@ -347,5 +359,82 @@ class _AiDetails extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _GitHubDetails extends StatelessWidget {
+  const _GitHubDetails({required this.report});
+
+  final GitHubReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (!report.configured) {
+      return const Text(
+        'Aucun dépôt autorisé sur le serveur (NEXORA_GITHUB_REPOS). '
+        'Lecture seule : NEXORA ne modifie jamais GitHub.',
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final repo in report.repos)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(repo.repo, style: theme.textTheme.titleSmall),
+                const SizedBox(height: 4),
+                if (!repo.available)
+                  NoticeBar(
+                    tone: 'warning',
+                    message: repo.error ?? 'Indisponible',
+                  )
+                else ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (repo.runs.isNotEmpty) _runChip(repo.runs.first),
+                      StatusChip(
+                        label: '${repo.openIssues ?? 0} issue(s) ouverte(s)',
+                        icon: Icons.bug_report_outlined,
+                      ),
+                    ],
+                  ),
+                  if (repo.commits.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Dernier commit ${repo.commits.first.date == null ? '' : formatShort(repo.commits.first.date!)} : '
+                      '${repo.commits.first.message}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  static Widget _runChip(GitHubRun run) {
+    final name = run.name ?? 'GitHub Actions';
+    return switch (run.conclusion) {
+      'success' => StatusChip(
+        label: '$name : réussi',
+        tone: 'ok',
+        icon: Icons.check,
+      ),
+      null => StatusChip(label: '$name : en cours', icon: Icons.timelapse),
+      _ => StatusChip(
+        label:
+            '$name : ${run.conclusion == 'failure' ? 'échec' : run.conclusion}',
+        tone: 'error',
+        icon: Icons.close,
+      ),
+    };
   }
 }

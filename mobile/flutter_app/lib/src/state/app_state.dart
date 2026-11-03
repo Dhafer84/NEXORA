@@ -4,10 +4,15 @@ import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 
 import '../api/api_client.dart';
+import '../alerts/background_alerts.dart';
 import '../api/api_error.dart';
+import '../files/file_access.dart';
 import '../storage/credentials_store.dart';
 
 typedef ApiFactory = NexoraApi Function(String baseUrl, String apiKey);
+
+/// IANA name of the phone's time zone, e.g. `Europe/Paris`.
+typedef TimezoneProvider = Future<String> Function();
 
 NexoraApi defaultApiFactory(String baseUrl, String apiKey) =>
     NexoraApi(baseUrl: baseUrl, apiKey: apiKey, client: http.Client());
@@ -30,9 +35,22 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     required this.store,
     ApiFactory? apiFactory,
     this.pollInterval = const Duration(seconds: 30),
-  }) : _apiFactory = apiFactory ?? defaultApiFactory;
+    this.alerts,
+    this.files,
+    this.folderMemory,
+    TimezoneProvider? timezone,
+  }) : _apiFactory = apiFactory ?? defaultApiFactory,
+       timezone = timezone ?? (() async => 'Europe/Paris');
 
   final CredentialsStore store;
+
+  /// Phone notifications for server alerts; null where unsupported (tests).
+  final AlertsController? alerts;
+
+  /// Local file organisation in one user-picked folder; null where unsupported.
+  final FileAccess? files;
+  final FolderMemory? folderMemory;
+  final TimezoneProvider timezone;
   final ApiFactory _apiFactory;
   final Duration pollInterval;
 

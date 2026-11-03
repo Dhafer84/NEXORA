@@ -102,6 +102,7 @@ $C run --rm backend python -m app.migrate down 0   # retour à la version 0
 | Version | Contenu | Retour arrière |
 | --- | --- | --- |
 | 0001 | `conversations`, `messages`, `tool_executions`, `approval_requests`, index et contraintes | Supprime ces quatre tables **et leurs données** |
+| 0002 | `automations`, `automation_runs`, `notifications` (tâches planifiées, historique, alertes) | `down 1` : supprime ces trois tables et leurs données ; conversations et validations restent |
 
 Les migrations ne sont pas lancées au démarrage de l’API : elles sont une étape
 explicite, après la sauvegarde. Les routes de santé et de métriques fonctionnent
@@ -141,8 +142,10 @@ la base. Sans fournisseur IA configuré, il vérifie que l’envoi de message r�
    migrations postérieures à la version visée
    (`$C run --rm backend python -m app.migrate down <version>`), puis revenir au
    code visé, `build` et `up`. Retour à l’étape 1 : `down 0` puis
-   `git checkout d42f6f1`. Cette annulation supprime conversations, validations
-   et traces : sauvegarder avant.
+   `git checkout d42f6f1`. Retour à l’étape 3 (avant les automatisations) :
+   `down 1` puis `git checkout e4b3965` ; seules les tâches, leur historique et les
+   notifications sont supprimés. Ces annulations suppriment des données :
+   sauvegarder avant.
 3. Restauration complète : arrêter le backend (`$C stop backend`), restaurer la
    sauvegarde dans une base de test pour la vérifier, puis dans `nexora` avec
    `pg_restore --clean --if-exists`, ensuite redémarrer le code correspondant.
@@ -191,13 +194,36 @@ et `NEXORA_AI_TURN_DEADLINE_SECONDS`.
 
 ## Permissions
 
-`NEXORA_PERMISSIONS` (défaut `server:read,database:read,test:execute`) liste les
-permissions de la clé personnelle. Retirer une permission retire l’outil
+`NEXORA_PERMISSIONS` (défaut `server:read,database:read,test:execute,automation:read,automation:write,notifications:read,github:read`)
+liste les permissions de la clé personnelle. Retirer une permission retire l’outil
 correspondant du modèle et fait refuser toute exécution, y compris d’une action
 déjà approuvée. Les routes historiques suivent les mêmes règles :
 `/api/v1/server/metrics` exige `server:read` et `/health/ready` exige
 `database:read`. `/health/live` reste sans clé pour le contrôle Docker et
 `scripts/check_api.py` suppose les permissions par défaut.
+
+## Planificateur
+
+Le backend démarre un fil de planification (une vérification des échéances toutes
+les 20 s, `NEXORA_SCHEDULER_POLL_SECONDS`). Il ne dépend pas du fournisseur IA et
+fonctionne si NVIDIA est indisponible. `NEXORA_SCHEDULER_ENABLED=false` le coupe
+(les vérifications manuelles restent possibles). Une seule instance du backend est
+prévue ; une seconde n’exécuterait pas deux fois un créneau (verrou de ligne et
+index unique), mais ce n’est pas une configuration testée en production.
+Journaux : `automation_run automation=<id> trigger=<schedule|manual> status=<…>`,
+sans valeur sensible.
+
+## Rapports GitHub (lecture seule)
+
+`NEXORA_GITHUB_REPOS` dans `.env` liste les dépôts autorisés
+(`Dhafer84/NEXORA,Dhafer84/colonie`, 10 au plus). Vide : fonction désactivée.
+Le backend ne fait que des requêtes `GET` vers `api.github.com`, pour ces dépôts
+seulement ; aucun nom de dépôt n’est accepté depuis l’application ou le modèle.
+Résultats en cache 5 minutes. Sans jeton : dépôts publics seulement (limite
+GitHub de 60 requêtes par heure). Pour des dépôts privés, créer un jeton
+« fine-grained » limité à ces dépôts, en lecture seule (Contents, Issues,
+Metadata, Actions), dans `secrets/github_token` (mode 600), puis ajouter
+`-f infrastructure/compose.github.yml` à `$C`.
 
 ## Sauvegarde et vérification de restauration
 

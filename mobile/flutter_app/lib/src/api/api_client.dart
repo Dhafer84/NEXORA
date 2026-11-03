@@ -143,6 +143,81 @@ class NexoraApi {
     timeout: turnTimeout,
   );
 
+  // ----- Automations ---------------------------------------------------------
+
+  Future<List<Automation>> automations() =>
+      _list('/api/v1/automations', Automation.fromJson);
+
+  Future<Automation> automation(String id) =>
+      _object('GET', '/api/v1/automations/$id', Automation.fromJson);
+
+  Future<Automation> createAutomation({
+    required String name,
+    required double thresholdPercent,
+    required int intervalMinutes,
+    required String timezone,
+    bool enabled = true,
+  }) => _object(
+    'POST',
+    '/api/v1/automations',
+    Automation.fromJson,
+    body: {
+      'name': name,
+      'kind': 'disk_check',
+      'threshold_percent': thresholdPercent,
+      'interval_minutes': intervalMinutes,
+      'timezone': timezone,
+      'enabled': enabled,
+    },
+  );
+
+  /// Sends only the given fields. Same values twice give the same result.
+  Future<Automation> updateAutomation(
+    String id, {
+    String? name,
+    double? thresholdPercent,
+    int? intervalMinutes,
+    String? timezone,
+    bool? enabled,
+  }) => _object(
+    'PATCH',
+    '/api/v1/automations/$id',
+    Automation.fromJson,
+    body: {
+      'name': ?name,
+      'threshold_percent': ?thresholdPercent,
+      'interval_minutes': ?intervalMinutes,
+      'timezone': ?timezone,
+      'enabled': ?enabled,
+    },
+  );
+
+  Future<void> deleteAutomation(String id) async {
+    await _send('DELETE', '/api/v1/automations/$id');
+  }
+
+  /// Manual check. Not retried automatically: a timeout leaves the outcome
+  /// unknown, and the history tells whether it ran.
+  Future<AutomationRun> runAutomation(String id) =>
+      _object('POST', '/api/v1/automations/$id/run', AutomationRun.fromJson);
+
+  Future<List<AutomationRun>> automationRuns(String id, {int limit = 50}) =>
+      _list(
+        '/api/v1/automations/$id/runs?limit=$limit',
+        AutomationRun.fromJson,
+      );
+
+  Future<NotificationPage> notifications({int afterId = 0, int limit = 20}) =>
+      _object(
+        'GET',
+        '/api/v1/notifications?after_id=$afterId&limit=$limit',
+        NotificationPage.fromJson,
+      );
+
+  /// Allow-listed repositories only; read-only on the server side.
+  Future<GitHubReport> github() =>
+      _object('GET', '/api/v1/github', GitHubReport.fromJson);
+
   // ----- Transport -----------------------------------------------------------
 
   Future<T> _object<T>(

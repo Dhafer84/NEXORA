@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../state/app_state.dart';
 import 'screens/approvals_screen.dart';
+import 'screens/automations_screen.dart';
 import 'screens/conversations_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/settings_screen.dart';
@@ -33,6 +34,7 @@ class _HomeShellState extends State<HomeShell> {
     final screens = [
       const ConversationsScreen(),
       const DashboardScreen(),
+      const AutomationsScreen(),
       const ApprovalsScreen(),
       const SettingsScreen(),
     ];
@@ -51,6 +53,11 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icon(Icons.monitor_heart_outlined),
             selectedIcon: Icon(Icons.monitor_heart),
             label: 'Serveur',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.schedule_outlined),
+            selectedIcon: Icon(Icons.schedule),
+            label: 'Tâches',
           ),
           NavigationDestination(
             icon: Badge(

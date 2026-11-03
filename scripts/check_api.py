@@ -1,8 +1,10 @@
 """Probe a local or HTTPS deployment; credentials never enter command arguments.
 
-Usage: python3 scripts/check_api.py [BASE_URL] [--parcours]
+Usage: python3 scripts/check_api.py [BASE_URL] [--parcours] [--automatisation]
 --parcours also runs a tool, an approval cycle and, when configured, an AI message.
 It writes a test conversation and a harmless test approval into the database.
+--automatisation creates a suspended disk check with a 1 % test threshold, runs it
+by hand (alert + notification, seen by phones with alerts on), then deletes it.
 """
 
 import json
@@ -16,6 +18,7 @@ from urllib.request import Request, urlopen
 root = Path(__file__).resolve().parents[1]
 args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
 full = "--parcours" in sys.argv[1:]
+automation = "--automatisation" in sys.argv[1:]
 base = (args[0] if args else "http://127.0.0.1:8100").rstrip("/")
 url = urlsplit(base)
 if url.username or url.password or url.query or url.fragment or url.path:
@@ -39,9 +42,10 @@ def call(method: str, path: str, body: dict | None = None, expected: int = 200) 
     request = Request(base + path, data=data, headers=headers, method=method)
     try:
         with urlopen(request, timeout=120) as response:
-            status, payload = response.status, json.load(response)
+            raw = response.read()
+            status, payload = response.status, json.loads(raw) if raw else {}
     except HTTPError as error:
-        status, payload = error.code, json.load(error)
+        status, payload = error.code, (json.load(error) if error.code != 204 else {})
     assert status == expected, f"{method} {path} : HTTP {status} au lieu de {expected}"
     return payload
 
@@ -100,3 +104,23 @@ if full:
     history = call("GET", f"/api/v1/conversations/{conversation['id']}")
     print("Historique :", len(history["messages"]), "message(s)")
     print("Parcours complet réussi.")
+
+if automation:
+    body = {
+        "name": "Essai de déploiement",
+        "threshold_percent": 1,
+        "interval_minutes": 60,
+        "timezone": "Europe/Paris",
+        "enabled": False,
+    }
+    task = call("POST", "/api/v1/automations", body, 201)
+    before = call("GET", "/api/v1/notifications?limit=1")["latest_id"]
+    run = call("POST", f"/api/v1/automations/{task['id']}/run")
+    assert run["status"] == "alert" and run["notified"], run
+    again = call("POST", f"/api/v1/automations/{task['id']}/run")
+    assert again["status"] == "alert" and not again["notified"], again
+    page = call("GET", f"/api/v1/notifications?after_id={before}")
+    assert [item["level"] for item in page["items"]] == ["alert"], page
+    assert len(call("GET", f"/api/v1/automations/{task['id']}/runs")) == 2
+    call("DELETE", f"/api/v1/automations/{task['id']}", expected=204)
+    print("Automatisation : mesure", run["measured_percent"], "% ; une alerte ; tâche supprimée.")

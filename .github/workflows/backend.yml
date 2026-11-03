@@ -38,6 +38,6 @@ jobs:
       - run: docker compose --env-file .env -f infrastructure/compose.yml build
       - run: docker compose --env-file .env -f infrastructure/compose.yml run --rm backend python -m app.migrate up
       - run: docker compose --env-file .env -f infrastructure/compose.yml up --wait --wait-timeout 120
-      - run: python3 scripts/check_api.py --parcours
+      - run: python3 scripts/check_api.py --parcours --automatisation
       - if: always()
         run: docker compose --env-file .env -f infrastructure/compose.yml down -v

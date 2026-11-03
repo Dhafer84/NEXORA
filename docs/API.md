@@ -136,3 +136,60 @@ Erreurs : `503 ai_not_configured` (aucun fournisseur ou clé absente) ;
 `503 ai_<code>` en cas d’échec du fournisseur (`unavailable`, `timeout`, `auth`,
 `rate_limited`, `rejected`, `bad_response`). Le message de l’utilisateur et une
 réponse d’erreur restent dans l’historique. `404 conversation_not_found`.
+
+## Automatisations
+
+| Méthode et route | Permission | Fonction |
+| --- | --- | --- |
+| `GET /api/v1/automations` | `automation:read` | Liste, avec la dernière exécution |
+| `POST /api/v1/automations` | `automation:write` + `server:read` | Crée une vérification du disque → `201` |
+| `GET /api/v1/automations/{id}` | `automation:read` | Détail |
+| `PATCH /api/v1/automations/{id}` | `automation:write` | Modifie `name`, `threshold_percent`, `interval_minutes`, `timezone`, `enabled` |
+| `DELETE /api/v1/automations/{id}` | `automation:write` | Supprime la tâche et son historique → `204` |
+| `POST /api/v1/automations/{id}/run` | `automation:write` + `server:read` | Vérification manuelle immédiate |
+| `GET /api/v1/automations/{id}/runs?limit=50` | `automation:read` | Historique, du plus récent au plus ancien |
+| `GET /api/v1/notifications?after_id=0&limit=20` | `notifications:read` | Notifications d’id supérieur à `after_id`, et `latest_id` |
+
+Création :
+
+```json
+{"name": "Vérification du disque", "kind": "disk_check", "threshold_percent": 85,
+ "interval_minutes": 60, "timezone": "Europe/Paris", "enabled": true}
+```
+
+- `threshold_percent` : strictement entre 0 et 100 (deux décimales). Un seuil bas
+  (1 %) sert d’essai : il déclenche une alerte sans remplir le disque.
+- `interval_minutes` : 15, 30, 60, 120, 180, 360, 720 ou 1440.
+- `timezone` : nom IANA (`Europe/Paris`) ; `422` sinon. 20 tâches au plus (`409 automation_limit`).
+- `next_run_at` est renvoyé dans le fuseau de la tâche (`2026-11-03T11:00:00+01:00`) ; `null` quand la tâche est suspendue.
+
+Exécution (`status`) : `ok` (sous le seuil), `alert` (seuil atteint), `failed`
+(`error_code` = `metrics_unavailable` ou `permission_denied`). Chaque exécution
+enregistre `trigger` (`schedule` ou `manual`), `scheduled_for`, `started_at`,
+`finished_at`, `measured_percent`, `threshold_percent`, `message`, `notified` et
+`missed_slots`.
+
+Planification :
+
+- Les créneaux sont les heures locales du fuseau de la tâche, multiples de
+  l’intervalle depuis minuit (toutes les heures = chaque hh:00). Changement d’heure :
+  l’heure sautée n’a pas de créneau, l’heure répétée en a deux.
+- Le planificateur tourne dans le processus backend (toutes les 20 s,
+  `NEXORA_SCHEDULER_POLL_SECONDS`), indépendamment du fournisseur IA.
+- Un créneau s’exécute une seule fois : la prochaine échéance avance dans la même
+  transaction que l’enregistrement de l’exécution, et un index unique
+  `(automation_id, scheduled_for)` refuse un doublon. Après un arrêt, seul le
+  dernier créneau échu est exécuté ; les précédents sont comptés dans
+  `missed_slots`. Un arrêt pendant une exécution annule la transaction : le créneau
+  est rejoué une fois au redémarrage.
+- Suspendre (`enabled: false`) retire l’échéance ; reprendre repart du prochain
+  créneau sans rejouer la pause. Une vérification manuelle ne déplace pas l’échéance.
+
+Règle anti-répétition : une notification `alert` quand le seuil est atteint, aucune
+tant que le disque reste au-dessus, une notification `recovery` au retour sous le
+seuil. Une notification `failure` quand la mesure devient impossible, aucune tant
+qu’elle le reste. Changer le seuil réarme l’alerte.
+
+Le téléphone lit `/api/v1/notifications` en arrière-plan (curseur `after_id`) et
+affiche chaque nouvelle notification ; l’identifiant sert d’identifiant Android, un
+second affichage remplace le premier.

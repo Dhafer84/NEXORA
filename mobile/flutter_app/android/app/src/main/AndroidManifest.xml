@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- HTTPS calls to the private NEXORA backend. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Server alerts shown by the background check (asked at runtime on Android 13+).
+         WorkManager adds RECEIVE_BOOT_COMPLETED so the check resumes after a reboot. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- No backup: the personal key must stay in this device's Keystore. Cleartext
          traffic stays disabled (default for targetSdk >= 28); only debug builds
          allow HTTP to the emulator host, see src/debug. -->

@@ -30,6 +30,8 @@ services:
       NEXORA_API_KEY: ${NEXORA_API_KEY:?Générer le fichier .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Générer le fichier .env}
       POSTGRES_HOST: db
+      # Read-only GitHub reports: "owner/name,owner/name"; empty = disabled.
+      NEXORA_GITHUB_REPOS: ${NEXORA_GITHUB_REPOS:-}
     depends_on:
       db:
         condition: service_healthy

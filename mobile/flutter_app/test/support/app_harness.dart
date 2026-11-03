@@ -5,6 +5,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:nexora/main.dart';
+import 'package:nexora/src/alerts/background_alerts.dart';
+import 'package:nexora/src/files/file_access.dart';
 import 'package:nexora/src/state/app_state.dart';
 import 'package:nexora/src/storage/credentials_store.dart';
 
@@ -36,6 +38,9 @@ Future<AppState> pumpApp(
   FakeBackend backend, {
   bool configured = true,
   ThemeMode themeMode = ThemeMode.light,
+  AlertsController? alerts,
+  FileAccess? files,
+  FolderMemory? folderMemory,
 }) async {
   await initializeDateFormatting('fr_FR');
   FlutterSecureStorage.setMockInitialValues(
@@ -51,10 +56,39 @@ Future<AppState> pumpApp(
   final state = AppState(
     store: SecureCredentialsStore(),
     apiFactory: backend.factory,
+    alerts: alerts ?? FakeAlerts(),
+    files: files,
+    folderMemory: folderMemory,
+    timezone: () async => 'Europe/Paris',
   );
   _current = state;
   await tester.pumpWidget(NexoraApp(state: state, themeMode: themeMode));
   await state.load();
   await tester.pumpAndSettle();
   return _current = state;
+}
+
+/// Phone alerts without Android: records what the app asked for.
+class FakeAlerts implements AlertsController {
+  FakeAlerts({this.permitted = true});
+
+  /// What Android answers to the notification permission request.
+  bool permitted;
+  bool enabled = false;
+  int enableCalls = 0;
+
+  @override
+  Future<AlertsStatus> status() async =>
+      AlertsStatus(enabled: enabled, permitted: permitted);
+
+  @override
+  Future<String?> enable() async {
+    enableCalls++;
+    if (!permitted) return 'Notifications refusées par Android.';
+    enabled = true;
+    return null;
+  }
+
+  @override
+  Future<void> disable() async => enabled = false;
 }

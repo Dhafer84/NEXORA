@@ -103,9 +103,34 @@ void main() {
     await pumpApp(tester, FakeBackend());
     await tapText(tester, 'Serveur');
     expect(find.text('Processeur'), findsOneWidget);
-    expect(find.text('12,5 %'), findsOneWidget);
+    expect(find.text('12,5\u00a0%'), findsOneWidget);
     expect(textHas('Mesuré'), findsOneWidget);
     expect(textHas('serveur Ubuntu'), findsOneWidget);
+  });
+
+  testApp('tableau de bord : projets GitHub en lecture seule', (tester) async {
+    final backend = FakeBackend();
+    await pumpApp(tester, backend);
+    await tapText(tester, 'Serveur');
+    await tester.scrollUntilVisible(
+      find.text('Dhafer84/assistant'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Mobile checks : échec'), findsOneWidget);
+    expect(find.text('2 issue(s) ouverte(s)'), findsOneWidget);
+    expect(textHas('Enregistre l’adresse et la clé ensemble'), findsOneWidget);
+    expect(
+      find.text('Dépôt introuvable, ou privé sans jeton d’accès'),
+      findsOneWidget,
+    );
+    expect(
+      backend.requests
+          .where((r) => r.url.path.contains('github'))
+          .map((r) => r.method)
+          .toSet(),
+      {'GET'},
+    );
   });
 
   testApp('conversation : créer, envoyer, réponse simulée signalée', (
@@ -260,10 +285,27 @@ void main() {
             provider: 'simulated',
           );
         await pumpApp(tester, backend, themeMode: mode);
-        for (final tab in ['Serveur', 'Validations', 'Réglages']) {
+        backend
+          ..addAutomation(name: 'Vérification du disque du serveur principal')
+          ..diskPercent = 91.25;
+        for (final tab in ['Serveur', 'Tâches', 'Validations', 'Réglages']) {
           await tapText(tester, tab);
           expect(tester.takeException(), isNull, reason: tab);
         }
+        await tapText(tester, 'Tâches');
+        await tester.scrollUntilVisible(
+          find.text('Vérification du disque du serveur principal'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tapText(tester, 'Vérification du disque du serveur principal');
+        await tapText(tester, 'Vérifier maintenant');
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.byTooltip('Modifier'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await goBack(tester);
+        await goBack(tester);
         await tapText(tester, 'Validations');
         await tapText(tester, 'Action de test');
         expect(tester.takeException(), isNull);

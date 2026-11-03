@@ -18,7 +18,8 @@ String formatShort(DateTime value, {DateTime? now}) {
 }
 
 String formatPercent(double value) =>
-    '${NumberFormat('0.0', 'fr_FR').format(value)} %';
+    // Non-breaking space: the unit never wraps away from its number.
+    '${NumberFormat('0.0', 'fr_FR').format(value)}\u00a0%';
 
 String formatBytes(int bytes) {
   const units = ['o', 'Ko', 'Mo', 'Go', 'To'];

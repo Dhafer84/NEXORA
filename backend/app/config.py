@@ -1,8 +1,11 @@
+import re
 from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+GITHUB_REPO = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]{1,100}$")
 
 
 class Settings(BaseSettings):
@@ -19,9 +22,21 @@ class Settings(BaseSettings):
     nexora_disk_path: str = "/"
 
     # Permissions granted to the personal key, comma separated.
-    nexora_permissions: str = "server:read,database:read,test:execute"
+    nexora_permissions: str = (
+        "server:read,database:read,test:execute,automation:read,automation:write,"
+        "notifications:read,github:read"
+    )
     nexora_approval_ttl_seconds: int = Field(default=600, ge=30, le=86400)
     nexora_max_request_bytes: int = Field(default=32768, ge=1024, le=1048576)
+
+    # Automation scheduler: one thread in the backend process, independent of the AI.
+    nexora_scheduler_enabled: bool = True
+    nexora_scheduler_poll_seconds: float = Field(default=20, ge=1, le=300)
+
+    # Read-only GitHub reports: allow-list "owner/name,owner/name" (empty = off).
+    # Optional token file (fine-grained, read-only) for private repositories.
+    nexora_github_repos: str = ""
+    nexora_github_token_file: str = "/run/secrets/github_token"
 
     # "none" keeps the assistant disabled; "simulated" is a test double, never a real AI.
     nexora_ai_provider: Literal["none", "simulated", "openai_compatible"] = "none"
@@ -57,6 +72,18 @@ class Settings(BaseSettings):
         if (url.scheme != "https" and not local) or url.username or url.password or url.query:
             raise ValueError("URL du fournisseur IA : HTTPS sans identifiants requis")
         return value.rstrip("/")
+
+    @field_validator("nexora_github_repos")
+    @classmethod
+    def validate_github_repos(cls, value: str) -> str:
+        repos = [item.strip() for item in value.split(",") if item.strip()]
+        if len(repos) > 10 or any(not GITHUB_REPO.match(repo) for repo in repos):
+            raise ValueError("NEXORA_GITHUB_REPOS : 10 dépôts « propriétaire/nom » au plus")
+        return ",".join(repos)
+
+    @property
+    def github_repos(self) -> list[str]:
+        return [repo for repo in self.nexora_github_repos.split(",") if repo]
 
     @property
     def permissions(self) -> frozenset[str]:

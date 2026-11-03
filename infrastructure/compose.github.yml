@@ -1,0 +1,14 @@
+# Optional: GitHub token for private repositories (read-only reports).
+# Add only once ../secrets/github_token exists (mode 600, owned by the deploying user):
+# a fine-grained token limited to the listed repositories, with read-only access to
+# Contents, Issues, Metadata and Actions. Never in .env, Git, logs or arguments.
+services:
+  backend:
+    user: "${NEXORA_UID:-1000}:${NEXORA_GID:-1000}"
+    environment:
+      NEXORA_GITHUB_TOKEN_FILE: /run/secrets/github_token
+    secrets: [github_token]
+
+secrets:
+  github_token:
+    file: ../secrets/github_token

@@ -302,3 +302,239 @@ class ServerMetrics {
   final Capacity memory;
   final Capacity disk;
 }
+
+double? _optionalDouble(Object? value) =>
+    value == null ? null : (value as num).toDouble();
+
+/// Allowed check intervals, in minutes (same list as the backend).
+const automationIntervals = [15, 30, 60, 120, 180, 360, 720, 1440];
+
+class AutomationRun {
+  const AutomationRun({
+    required this.id,
+    required this.automationId,
+    required this.trigger,
+    required this.scheduledFor,
+    required this.missedSlots,
+    required this.startedAt,
+    required this.finishedAt,
+    required this.status,
+    required this.measuredPercent,
+    required this.thresholdPercent,
+    required this.errorCode,
+    required this.message,
+    required this.notified,
+  });
+
+  factory AutomationRun.fromJson(Map<String, dynamic> json) => AutomationRun(
+    id: json['id'] as String,
+    automationId: json['automation_id'] as String,
+    trigger: json['trigger'] as String,
+    scheduledFor: _optionalDate(json['scheduled_for']),
+    missedSlots: json['missed_slots'] as int,
+    startedAt: _date(json['started_at']),
+    finishedAt: _date(json['finished_at']),
+    status: json['status'] as String,
+    measuredPercent: _optionalDouble(json['measured_percent']),
+    thresholdPercent: (json['threshold_percent'] as num).toDouble(),
+    errorCode: json['error_code'] as String?,
+    message: json['message'] as String,
+    notified: json['notified'] as bool,
+  );
+
+  final String id;
+  final String automationId;
+
+  /// `schedule` or `manual`.
+  final String trigger;
+  final DateTime? scheduledFor;
+  final int missedSlots;
+  final DateTime startedAt;
+  final DateTime finishedAt;
+
+  /// `ok`, `alert` or `failed`.
+  final String status;
+  final double? measuredPercent;
+  final double thresholdPercent;
+  final String? errorCode;
+  final String message;
+  final bool notified;
+}
+
+class Automation {
+  const Automation({
+    required this.id,
+    required this.name,
+    required this.kind,
+    required this.thresholdPercent,
+    required this.intervalMinutes,
+    required this.timezone,
+    required this.enabled,
+    required this.nextRunAt,
+    required this.alertActive,
+    required this.failing,
+    required this.lastRun,
+    required this.updatedAt,
+  });
+
+  factory Automation.fromJson(Map<String, dynamic> json) => Automation(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    kind: json['kind'] as String,
+    thresholdPercent: (json['threshold_percent'] as num).toDouble(),
+    intervalMinutes: json['interval_minutes'] as int,
+    timezone: json['timezone'] as String,
+    enabled: json['enabled'] as bool,
+    nextRunAt: _optionalDate(json['next_run_at']),
+    alertActive: json['alert_active'] as bool,
+    failing: json['failing'] as bool,
+    lastRun: json['last_run'] == null
+        ? null
+        : AutomationRun.fromJson(_map(json['last_run'])),
+    updatedAt: _date(json['updated_at']),
+  );
+
+  final String id;
+  final String name;
+  final String kind;
+  final double thresholdPercent;
+  final int intervalMinutes;
+
+  /// IANA time zone of the schedule, e.g. `Europe/Paris`.
+  final String timezone;
+  final bool enabled;
+
+  /// Null while suspended.
+  final DateTime? nextRunAt;
+  final bool alertActive;
+  final bool failing;
+  final AutomationRun? lastRun;
+  final DateTime updatedAt;
+}
+
+class ServerNotification {
+  const ServerNotification({
+    required this.id,
+    required this.createdAt,
+    required this.level,
+    required this.title,
+    required this.body,
+  });
+
+  factory ServerNotification.fromJson(Map<String, dynamic> json) =>
+      ServerNotification(
+        id: json['id'] as int,
+        createdAt: _date(json['created_at']),
+        level: json['level'] as String,
+        title: json['title'] as String,
+        body: json['body'] as String,
+      );
+
+  final int id;
+  final DateTime createdAt;
+
+  /// `alert`, `recovery` or `failure`.
+  final String level;
+  final String title;
+  final String body;
+}
+
+class NotificationPage {
+  const NotificationPage({required this.items, required this.latestId});
+
+  factory NotificationPage.fromJson(Map<String, dynamic> json) =>
+      NotificationPage(
+        items: [
+          for (final item in json['items'] as List)
+            ServerNotification.fromJson(Map<String, dynamic>.from(item as Map)),
+        ],
+        latestId: json['latest_id'] as int,
+      );
+
+  final List<ServerNotification> items;
+  final int latestId;
+}
+
+class GitHubCommit {
+  const GitHubCommit({required this.sha, required this.message, this.date});
+
+  factory GitHubCommit.fromJson(Map<String, dynamic> json) => GitHubCommit(
+    sha: json['sha'] as String,
+    message: json['message'] as String,
+    date: _optionalDate(json['date']),
+  );
+
+  final String sha;
+  final String message;
+  final DateTime? date;
+}
+
+class GitHubRun {
+  const GitHubRun({
+    required this.name,
+    required this.status,
+    required this.conclusion,
+    required this.createdAt,
+  });
+
+  factory GitHubRun.fromJson(Map<String, dynamic> json) => GitHubRun(
+    name: json['name'] as String?,
+    status: json['status'] as String?,
+    conclusion: json['conclusion'] as String?,
+    createdAt: _date(json['created_at']),
+  );
+
+  final String? name;
+  final String? status;
+
+  /// `success`, `failure`, `cancelled`… ; null while running.
+  final String? conclusion;
+  final DateTime createdAt;
+}
+
+class GitHubRepo {
+  const GitHubRepo({
+    required this.repo,
+    required this.available,
+    required this.error,
+    required this.openIssues,
+    required this.commits,
+    required this.runs,
+  });
+
+  factory GitHubRepo.fromJson(Map<String, dynamic> json) => GitHubRepo(
+    repo: json['repo'] as String,
+    available: json['available'] as bool,
+    error: json['error'] as String?,
+    openIssues: json['open_issues'] as int?,
+    commits: [
+      for (final item in json['commits'] as List)
+        GitHubCommit.fromJson(_map(item)),
+    ],
+    runs: [
+      for (final item in json['workflow_runs'] as List)
+        GitHubRun.fromJson(_map(item)),
+    ],
+  );
+
+  final String repo;
+  final bool available;
+  final String? error;
+  final int? openIssues;
+  final List<GitHubCommit> commits;
+  final List<GitHubRun> runs;
+}
+
+class GitHubReport {
+  const GitHubReport({required this.configured, required this.repos});
+
+  factory GitHubReport.fromJson(Map<String, dynamic> json) => GitHubReport(
+    configured: json['configured'] as bool,
+    repos: [
+      for (final item in json['repos'] as List) GitHubRepo.fromJson(_map(item)),
+    ],
+  );
+
+  final bool configured;
+  final List<GitHubRepo> repos;
+}

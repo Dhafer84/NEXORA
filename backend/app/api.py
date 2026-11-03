@@ -8,11 +8,20 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from app import conversations
+from app import automations, conversations
 from app.ai.engine import AssistantEngine, ProviderInfo, TurnBusy, TurnResult, tool_content
+from app.automations import (
+    AutomationChanges,
+    AutomationError,
+    AutomationView,
+    NewAutomation,
+    NotificationPage,
+    RunView,
+)
 from app.conversations import ConversationView, MessageView
 from app.database import connect
-from app.security import get_principal
+from app.github import GitHubReport
+from app.security import get_principal, require_permission
 from app.tools.permissions import Principal
 from app.tools.service import ApprovalView, ExecutionView, ToolError, ToolService
 
@@ -269,3 +278,132 @@ def ai_status(_: Caller, request: Request):
     else:
         detail = "Fournisseur sélectionné mais clé absente"
     return AIStatus(provider=engine.info, configured=configured, detail=detail)
+
+
+# ----- Automations ------------------------------------------------------------
+
+
+def _automation_error(error: AutomationError) -> HTTPException:
+    return HTTPException(error.status_code, {"code": error.code, "message": error.message})
+
+
+Read = [Depends(require_permission("automation:read"))]
+# Creating or running a disk check reads server data: it needs server:read too.
+Write = [Depends(require_permission("automation:write"))]
+Measure = [*Write, Depends(require_permission("server:read"))]
+
+
+@router.get(
+    "/automations", response_model=list[AutomationView], dependencies=Read, tags=["automations"]
+)
+def list_automations(db: Db):
+    return automations.list_all(db)
+
+
+@router.post(
+    "/automations",
+    response_model=AutomationView,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=Measure,
+    tags=["automations"],
+)
+def create_automation(body: NewAutomation, db: Db):
+    try:
+        return automations.create(db, body, automations.utc_now())
+    except AutomationError as error:
+        raise _automation_error(error) from None
+
+
+@router.get(
+    "/automations/{automation_id}",
+    response_model=AutomationView,
+    dependencies=Read,
+    tags=["automations"],
+)
+def get_automation(automation_id: UUID, db: Db):
+    try:
+        return automations.get(db, automation_id)
+    except AutomationError as error:
+        raise _automation_error(error) from None
+
+
+@router.patch(
+    "/automations/{automation_id}",
+    response_model=AutomationView,
+    dependencies=Write,
+    tags=["automations"],
+)
+def update_automation(automation_id: UUID, body: AutomationChanges, db: Db):
+    try:
+        return automations.update(db, automation_id, body, automations.utc_now())
+    except AutomationError as error:
+        raise _automation_error(error) from None
+
+
+@router.delete(
+    "/automations/{automation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=Write,
+    tags=["automations"],
+)
+def delete_automation(automation_id: UUID, db: Db) -> None:
+    try:
+        automations.delete(db, automation_id)
+    except AutomationError as error:
+        raise _automation_error(error) from None
+
+
+@router.post(
+    "/automations/{automation_id}/run",
+    response_model=RunView,
+    dependencies=Measure,
+    tags=["automations"],
+)
+def run_automation(automation_id: UUID, request: Request, db: Db):
+    try:
+        return automations.run_now(
+            db, automation_id, request.app.state.settings, request.app.state.measure
+        )
+    except AutomationError as error:
+        raise _automation_error(error) from None
+
+
+@router.get(
+    "/automations/{automation_id}/runs",
+    response_model=list[RunView],
+    dependencies=Read,
+    tags=["automations"],
+)
+def automation_runs(automation_id: UUID, db: Db, limit: Annotated[int, Query(ge=1, le=200)] = 50):
+    try:
+        return automations.runs(db, automation_id, limit)
+    except AutomationError as error:
+        raise _automation_error(error) from None
+
+
+@router.get(
+    "/notifications",
+    response_model=NotificationPage,
+    dependencies=[Depends(require_permission("notifications:read"))],
+    tags=["notifications"],
+)
+def list_notifications(
+    db: Db,
+    after_id: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+):
+    return automations.notifications(db, after_id, limit)
+
+
+# ----- GitHub (read only) -----------------------------------------------------
+
+
+@router.get(
+    "/github",
+    response_model=GitHubReport,
+    dependencies=[Depends(require_permission("github:read"))],
+    tags=["github"],
+)
+def github_report(request: Request):
+    # Allow-listed repositories only; no repository name is taken from the request.
+    return request.app.state.github.report()

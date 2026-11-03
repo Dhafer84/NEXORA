@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 import psycopg
 import pytest
+from app import migrate
 from app.database import connect
 from app.main import create_app
 from app.tools.builtin import ActionTestParameters, NoParameters, build_registry
@@ -69,7 +70,7 @@ def test_read_tool_runs_and_is_traced(client, db_settings):
 def test_database_tool_reports_schema_version(client):
     response = client.post("/api/v1/tools/database_status/invoke", json={}, headers=auth())
     assert response.json()["result"]["available"] is True
-    assert response.json()["result"]["schema_version"] == 1
+    assert response.json()["result"]["schema_version"] == len(migrate.available())
 
 
 def test_tool_catalogue_requires_key(client):

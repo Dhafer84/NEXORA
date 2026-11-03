@@ -5,6 +5,7 @@ import psycopg
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.database import check_database, connect
+from app.github import GitHubReader, GitHubReport
 from app.metrics import ServerMetrics, collect_metrics
 from app.tools.registry import ToolContext, ToolRegistry, ToolSpec
 
@@ -57,8 +58,27 @@ def test_action(_: ToolContext, params: ActionTestParameters) -> ActionTestResul
     )
 
 
-def build_registry() -> ToolRegistry:
+def build_registry(github: GitHubReader | None = None) -> ToolRegistry:
     registry = ToolRegistry()
+    if github is not None and github.repos:
+        registry.register(
+            ToolSpec(
+                name="github_report",
+                description=(
+                    "Résume les dépôts GitHub autorisés : derniers commits, issues ouvertes "
+                    "et résultats GitHub Actions. Lecture seule, dépôts de la liste "
+                    "autorisée uniquement."
+                ),
+                parameters=NoParameters,
+                result=GitHubReport,
+                permissions=frozenset({"github:read"}),
+                risk="low",
+                requires_approval=False,
+                timeout_seconds=45,
+                handler=lambda _context, _params: github.report(),
+                summarize=lambda _: "Lire l’état des dépôts GitHub autorisés",
+            )
+        )
     registry.register(
         ToolSpec(
             name="server_metrics",

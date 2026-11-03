@@ -1,5 +1,7 @@
 import logging
 import platform
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import psutil
@@ -12,8 +14,10 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from app.ai.engine import AssistantEngine
 from app.ai.factory import build_provider
 from app.api import router
+from app.automations import Scheduler
 from app.config import Settings
 from app.database import check_database
+from app.github import GitHubReader
 from app.metrics import ServerMetrics, collect_metrics
 from app.security import require_api_key, require_permission
 from app.tools.builtin import build_registry
@@ -77,9 +81,31 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise RuntimeError("Le point de mesure du disque est absent")
     # One configuration per process, set before serving requests.
     psutil.PROCFS_PATH = settings.nexora_procfs_path
-    app = FastAPI(title="NEXORA", version="0.2.0", docs_url=None, redoc_url=None, openapi_url=None)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        scheduler = Scheduler(settings, lambda: app.state.measure())
+        if settings.nexora_scheduler_enabled:
+            scheduler.start()
+        try:
+            yield
+        finally:
+            scheduler.stop()
+            app.state.github.close()
+
+    app = FastAPI(
+        title="NEXORA",
+        version="0.4.0",
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=lifespan,
+    )
     app.state.settings = settings
-    app.state.tools = ToolService(settings, build_registry())
+    # The scheduled disk check reuses the metrics reader of /api/v1/server/metrics.
+    app.state.measure = lambda: collect_metrics(settings)
+    app.state.github = GitHubReader(settings)
+    app.state.tools = ToolService(settings, build_registry(app.state.github))
     provider = build_provider(settings)
     # The assistant is optional: health and metrics never depend on it.
     app.state.engine = AssistantEngine(settings, app.state.tools, provider) if provider else None
@@ -122,7 +148,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     def metrics() -> ServerMetrics:
         try:
-            return collect_metrics(settings)
+            return app.state.measure()
         except (OSError, ValueError, psutil.Error):
             logger.warning("metrics_collection_failed")
             raise HTTPException(503, "Métriques indisponibles") from None

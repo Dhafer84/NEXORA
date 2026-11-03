@@ -6,6 +6,9 @@ from app import migrate
 from app.config import Settings
 from app.database import connect
 
+# Tests drive the scheduler explicitly (run_due with a fake clock).
+os.environ.setdefault("NEXORA_SCHEDULER_ENABLED", "false")
+
 KEY = "a7" * 32
 PASSWORD = "b8" * 32
 
