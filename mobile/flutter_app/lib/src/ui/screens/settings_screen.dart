@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../state/app_state.dart';
+import '../widgets/header.dart';
 import '../widgets/states.dart';
+import 'voice_bubble_settings.dart';
 
 /// Backend address and personal key. The stored key is never displayed again.
 class SettingsScreen extends StatefulWidget {
@@ -145,6 +147,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.firstRun ? 'Bienvenue dans NEXORA' : 'Réglages'),
+        actions: widget.firstRun ? null : headerActions(),
       ),
       body: SafeArea(
         child: Form(
@@ -160,7 +163,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
-                        Icons.vpn_lock,
+                        Icons.vpn_lock_rounded,
                         color: theme.colorScheme.onSecondaryContainer,
                       ),
                       const SizedBox(width: 12),
@@ -186,7 +189,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   labelText: 'Adresse HTTPS du serveur',
                   hintText: 'https://mon-serveur.tailnet.ts.net:8101',
                   errorMaxLines: 3,
-                  prefixIcon: Icon(Icons.dns_outlined),
+                  prefixIcon: Icon(Icons.dns_rounded),
                 ),
                 validator: (value) => checkBaseUrl(value ?? ''),
               ),
@@ -206,7 +209,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ? 'Une clé est enregistrée pour cette adresse. Laissez vide '
                             'pour la conserver ; une nouvelle adresse exige sa clé.'
                       : 'La clé est conservée dans le stockage sécurisé Android.',
-                  prefixIcon: const Icon(Icons.key_outlined),
+                  prefixIcon: const Icon(Icons.key_rounded),
                   suffixIcon: IconButton(
                     tooltip: _obscure
                         ? 'Afficher la saisie'
@@ -214,8 +217,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: () => setState(() => _obscure = !_obscure),
                     icon: Icon(
                       _obscure
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
                     ),
                   ),
                 ),
@@ -236,22 +239,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   OutlinedButton.icon(
                     onPressed: _busy ? null : _test,
-                    icon: const Icon(Icons.wifi_tethering),
+                    icon: const Icon(Icons.wifi_tethering_rounded),
                     label: const Text('Tester la connexion'),
                   ),
                   FilledButton.icon(
                     onPressed: _busy ? null : _save,
-                    icon: const Icon(Icons.save_outlined),
+                    icon: const Icon(Icons.save_rounded),
                     label: const Text('Enregistrer'),
                   ),
                 ],
               ),
+              if (!widget.firstRun && state.voice != null)
+                const VoiceSettings(),
+              if (!widget.firstRun && state.bubble != null)
+                const BubbleSettings(),
               if (state.hasKey) ...[
                 const SizedBox(height: 32),
                 const Divider(),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.delete_outline),
+                  leading: const Icon(Icons.delete_outline_rounded),
                   title: const Text('Supprimer la clé de ce téléphone'),
                   subtitle: const Text(
                     'Pour changer de téléphone ou révoquer l’accès local.',

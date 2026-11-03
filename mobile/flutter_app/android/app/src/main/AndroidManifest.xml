@@ -4,6 +4,9 @@
     <!-- Server alerts shown by the background check (asked at runtime on Android 13+).
          WorkManager adds RECEIVE_BOOT_COMPLETED so the check resumes after a reboot. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Dictation, one utterance per tap, asked at first use. No background
+         recording and no audio file: see VoiceBridge.kt. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- No backup: the personal key must stay in this device's Keystore. Cleartext
          traffic stays disabled (default for targetSdk >= 28); only debug builds
          allow HTTP to the emulator host, see src/debug. -->
@@ -36,6 +39,20 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Mini-chat shown inside the Android conversation bubble (BubbleBridge.kt).
+             Embedded and resizeable as Android requires for bubbles. -->
+        <activity
+            android:name=".BubbleActivity"
+            android:exported="false"
+            android:label="NEXORA"
+            android:allowEmbedded="true"
+            android:resizeableActivity="true"
+            android:documentLaunchMode="always"
+            android:enableOnBackInvokedCallback="true"
+            android:theme="@style/NormalTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize"/>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -51,6 +68,13 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Speech recognition and synthesis services of the phone (package visibility). -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE"/>
         </intent>
     </queries>
 </manifest>

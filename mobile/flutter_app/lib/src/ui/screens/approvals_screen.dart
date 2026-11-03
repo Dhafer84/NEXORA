@@ -62,7 +62,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
       body = const LoadingView(label: 'Chargement des validations…');
     } else if (items.isEmpty) {
       body = MessageView(
-        icon: Icons.task_alt,
+        icon: Icons.task_alt_rounded,
         title: _pendingOnly
             ? 'Aucune validation en attente'
             : 'Aucune validation',
@@ -85,7 +85,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
           IconButton(
             tooltip: 'Actualiser',
             onPressed: _load,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
@@ -98,12 +98,12 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
                 ButtonSegment(
                   value: true,
                   label: Text('En attente'),
-                  icon: Icon(Icons.pending_actions),
+                  icon: Icon(Icons.pending_actions_rounded),
                 ),
                 ButtonSegment(
                   value: false,
                   label: Text('Toutes'),
-                  icon: Icon(Icons.history),
+                  icon: Icon(Icons.history_rounded),
                 ),
               ],
               selected: {_pendingOnly},

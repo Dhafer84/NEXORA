@@ -12,6 +12,20 @@ Future<void> goBack(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// The validations button of the header (shield with the pending count).
+Future<void> openValidations(WidgetTester tester) async {
+  await tester.tap(
+    find
+        .byWidgetPredicate(
+          (widget) =>
+              widget is IconButton &&
+              (widget.tooltip ?? '').startsWith('Validations'),
+        )
+        .first,
+  );
+  await tester.pumpAndSettle();
+}
+
 Future<void> tapText(WidgetTester tester, String label) async {
   await tester.ensureVisible(find.text(label).last);
   await tester.pumpAndSettle();
@@ -46,7 +60,9 @@ void main() {
 
       await tapText(tester, 'Enregistrer');
       expect(state.configured, isTrue);
-      expect(find.text('Discussions'), findsWidgets);
+      // Messages is the main screen: a first conversation is opened directly.
+      expect(find.text('NEXORA'), findsOneWidget);
+      expect(find.text('Bonjour, que puis-je faire ?'), findsOneWidget);
       // The key typed earlier is never displayed back.
       expect(find.text(testApiKey), findsNothing);
     });
@@ -138,10 +154,10 @@ void main() {
   ) async {
     final backend = FakeBackend();
     await pumpApp(tester, backend);
-    expect(find.text('Aucune conversation'), findsOneWidget);
-    await tapText(tester, 'Nouvelle conversation');
-    await tapText(tester, 'Créer');
+    // No conversation yet: Messages creates one and opens it.
+    expect(find.text('Bonjour, que puis-je faire ?'), findsOneWidget);
     expect(backend.conversations, hasLength(1));
+    expect(find.text('Connecté'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField).last, 'Bonjour serveur');
     await tester.pump();
@@ -159,8 +175,6 @@ void main() {
   ) async {
     final backend = FakeBackend();
     final state = await pumpApp(tester, backend);
-    await tapText(tester, 'Nouvelle conversation');
-    await tapText(tester, 'Créer');
     await tester.enterText(
       find.byType(TextField).last,
       'lance une action de test',
@@ -168,18 +182,20 @@ void main() {
     await tester.pump();
     await tester.tap(find.byTooltip('Envoyer'));
     await tester.pumpAndSettle();
-    expect(textHas('attend votre validation'), findsOneWidget);
+    expect(find.text('Validation requise'), findsOneWidget);
+    expect(textHas('Rien n’est exécuté sans votre accord'), findsOneWidget);
     expect(backend.executions, 0);
+    expect(find.byTooltip('Validations : 1 en attente'), findsOneWidget);
 
-    await tapText(tester, 'Ouvrir la validation');
+    await tapText(tester, 'Voir la demande');
     expect(find.byType(ApprovalDetailScreen), findsOneWidget);
     await goBack(tester);
     expect(
-      textHas('attend votre validation'),
-      findsNothing,
-      reason: 'bannière retirée au retour de la validation',
+      find.text('Validation requise'),
+      findsOneWidget,
+      reason: 'toujours en attente : rien n’a été décidé',
     );
-    await tapText(tester, 'Ouvrir la validation');
+    await tapText(tester, 'Voir la demande');
     expect(find.text('En attente'), findsOneWidget);
     expect(textHas('"message": "bonjour"'), findsWidgets);
     expect(textHas(testHash), findsOneWidget);
@@ -202,12 +218,58 @@ void main() {
     expect(textHas('ajouté à la conversation'), findsOneWidget);
     expect(state.pendingApprovals, 0);
 
-    // Back to the conversation: the tool result is in the history.
+    // Back to the conversation: the request is no longer pending and the
+    // result is in the history.
     await goBack(tester);
-    await tester.tap(find.byTooltip('Recharger l’historique'));
+    expect(find.text('Validation requise'), findsNothing);
+    expect(find.text('Demande de validation traitée'), findsOneWidget);
+    expect(find.text('Action de démonstration'), findsOneWidget);
+    expect(find.text('Exécutée'), findsOneWidget);
+  });
+
+  testApp('chat : carte « Espace disque » avec la valeur réelle', (
+    tester,
+  ) async {
+    final backend = FakeBackend()..diskPercent = 63.4;
+    await pumpApp(tester, backend);
+    await tester.enterText(
+      find.byType(TextField).last,
+      'Vérifie l’espace disque',
+    );
+    await tester.pump();
+    await tester.tap(find.byTooltip('Envoyer'));
     await tester.pumpAndSettle();
-    expect(find.text('Action de test'), findsOneWidget);
-    expect(find.text('Réussi'), findsOneWidget);
+    expect(find.text('Espace disque'), findsOneWidget);
+    expect(find.text('63,4\u00a0%'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Espace disque utilisé : 63,4\u00a0%'),
+      findsOneWidget,
+    );
+    expect(textHas('Mémoire 41,7'), findsOneWidget);
+    // A read-only check never asks for a validation.
+    expect(find.text('Validation requise'), findsNothing);
+    expect(backend.approvals, isEmpty);
+    // The answer comes before its card, as on the reference design.
+    final answer = tester.getTopLeft(textHas('Le disque est utilisé'));
+    final card = tester.getTopLeft(find.text('Espace disque'));
+    expect(answer.dy, lessThan(card.dy));
+  });
+
+  testApp('chat : ancien message d’outil sans données structurées', (
+    tester,
+  ) async {
+    final backend = FakeBackend();
+    final id = backend.addConversation('Ancienne')['id'] as String;
+    backend
+      ..addMessage(id, 'user', 'État ?')
+      ..addMessage(id, 'tool', 'texte libre (ancien format)')
+      ..addMessage(id, 'assistant', 'Tout va bien.');
+    await pumpApp(tester, backend);
+    expect(textHas('Tout va bien.'), findsOneWidget);
+    expect(find.text('Espace disque'), findsNothing);
+    await tester.tap(find.byType(ExpansionTile));
+    await tester.pumpAndSettle();
+    expect(find.text('texte libre (ancien format)'), findsOneWidget);
   });
 
   testApp('validation consommée : résultat rejoué, jamais réexécuté', (
@@ -215,7 +277,7 @@ void main() {
   ) async {
     final backend = FakeBackend()..addApproval(status: 'consumed');
     await pumpApp(tester, backend);
-    await tapText(tester, 'Validations');
+    await openValidations(tester);
     await tapText(tester, 'Toutes');
     expect(textHas('demandée'), findsOneWidget);
     expect(textHas('expire'), findsNothing);
@@ -229,7 +291,7 @@ void main() {
   testApp('validation refusée avec motif', (tester) async {
     final backend = FakeBackend()..addApproval();
     await pumpApp(tester, backend);
-    await tapText(tester, 'Validations');
+    await openValidations(tester);
     await tapText(tester, 'Action de test');
     await tapText(tester, 'Refuser');
     await tester.enterText(find.byType(TextField).last, 'pas maintenant');
@@ -245,7 +307,7 @@ void main() {
     final backend = FakeBackend();
     final approval = backend.addApproval(status: 'approved');
     await pumpApp(tester, backend);
-    await tapText(tester, 'Validations');
+    await openValidations(tester);
     await tapText(tester, 'Toutes');
     await tapText(tester, 'Action de test');
     approval['status'] = 'expired';
@@ -262,8 +324,12 @@ void main() {
       ..addApproval()
       ..addApproval();
     await pumpApp(tester, backend);
-    expect(find.byTooltip('2 validation(s) en attente'), findsOneWidget);
-    expect(find.text('2'), findsOneWidget);
+    // Global access in every tab header.
+    for (final tab in ['Messages', 'Serveur', 'Tâches', 'Réglages']) {
+      await tapText(tester, tab);
+      expect(find.byTooltip('Validations : 2 en attente'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+    }
   });
 
   group('petit écran, thème sombre, grand texte', () {
@@ -288,10 +354,13 @@ void main() {
         backend
           ..addAutomation(name: 'Vérification du disque du serveur principal')
           ..diskPercent = 91.25;
-        for (final tab in ['Serveur', 'Tâches', 'Validations', 'Réglages']) {
+        for (final tab in ['Serveur', 'Tâches', 'Réglages']) {
           await tapText(tester, tab);
           expect(tester.takeException(), isNull, reason: tab);
         }
+        await openValidations(tester);
+        expect(tester.takeException(), isNull);
+        await goBack(tester);
         await tapText(tester, 'Tâches');
         await tester.scrollUntilVisible(
           find.text('Vérification du disque du serveur principal'),
@@ -306,11 +375,17 @@ void main() {
         expect(tester.takeException(), isNull);
         await goBack(tester);
         await goBack(tester);
-        await tapText(tester, 'Validations');
+        await openValidations(tester);
         await tapText(tester, 'Action de test');
         expect(tester.takeException(), isNull);
         await goBack(tester);
+        await goBack(tester);
         await tapText(tester, 'Messages');
+        expect(textHas('Charge faible.'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.byTooltip('Plus d’options'));
+        await tester.pumpAndSettle();
+        await tapText(tester, 'Discussions');
         await tapText(tester, 'Charge du serveur');
         expect(tester.takeException(), isNull);
       });

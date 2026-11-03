@@ -403,13 +403,30 @@ class FakeBackend {
     }
     final gate = turnGate;
     if (gate != null) await gate.future;
-    final user = addMessage(id, 'user', content);
+    final start = messages[id]!.length;
+    addMessage(id, 'user', content);
     final toolExecutions = <Map<String, dynamic>>[];
     var status = 'completed';
-    Map<String, dynamic> answer;
     if (content.contains('action de test')) {
       final approval = addApproval(conversationId: id);
-      answer = addMessage(
+      // Same shape as backend tool_content() for a request awaiting approval.
+      addMessage(
+        id,
+        'tool',
+        jsonEncode({
+          'tool': 'test_action',
+          'status': 'pending_approval',
+          'approval': {
+            'id': approval['id'],
+            'summary': approval['summary'],
+            'expires_at': approval['expires_at'],
+            'note': 'Action non exécutée : en attente de validation.',
+          },
+        }),
+        status: 'pending_approval',
+        approvalId: approval['id'] as String,
+      );
+      addMessage(
         id,
         'assistant',
         'Cette action demande votre validation.',
@@ -427,8 +444,40 @@ class FakeBackend {
         'error_message': null,
         'approval': approval,
       });
+    } else if (content.toLowerCase().contains('espace disque')) {
+      // Read-only tool: a structured result, never a validation request.
+      addMessage(
+        id,
+        'tool',
+        jsonEncode({
+          'tool': 'server_metrics',
+          'status': 'succeeded',
+          'result': {
+            'observed_at': _date(),
+            'scope': 'host',
+            'cpu_percent': 12.5,
+            'memory': {'used_percent': 41.7},
+            'disk': {'used_percent': diskPercent ?? 0},
+          },
+        }),
+      );
+      toolExecutions.add({
+        'execution_id': _id('exec'),
+        'tool': 'server_metrics',
+        'status': 'succeeded',
+        'result': null,
+        'error_code': null,
+        'error_message': null,
+        'approval': null,
+      });
+      addMessage(
+        id,
+        'assistant',
+        'Le disque est utilisé à ${diskPercent ?? 0} %.',
+        provider: 'simulated',
+      );
     } else {
-      answer = addMessage(
+      addMessage(
         id,
         'assistant',
         'Réponse **simulée** à : $content',
@@ -438,7 +487,7 @@ class FakeBackend {
     return jsonResponse({
       'conversation_id': id,
       'status': status,
-      'messages': [user, answer],
+      'messages': messages[id]!.sublist(start),
       'tool_executions': toolExecutions,
       'provider': simulatedProvider,
       'error_code': null,

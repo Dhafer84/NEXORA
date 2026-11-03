@@ -22,10 +22,49 @@ Onglets :
 
 | Onglet | Contenu |
 | --- | --- |
-| Messages | Liste des discussions, création, historique, envoi. Pendant un tour (jusqu’à 2 min), l’envoi est bloqué. Une réponse du fournisseur simulé est marquée « Simulation — pas une IA réelle ». |
+| Messages | Écran principal : la discussion courante, avec l’indicateur de connexion. Menu ⋮ : liste des discussions, nouvelle discussion, recharger, ouvrir dans la bulle. Pendant un tour (jusqu’à 2 min), l’envoi est bloqué. Les résultats d’outils s’affichent en cartes (« Espace disque » avec jauge, base de données, GitHub, action de démonstration) ; un ancien message non structuré garde son texte. Une réponse du fournisseur simulé est marquée « Simulation — pas une IA réelle ». |
 | Serveur | Disponibilité du backend et de PostgreSQL, CPU, RAM et disque avec date de mesure, état du fournisseur IA. Un refus 403 est expliqué (permission absente pour cette clé) sans masquer les autres blocs. |
-| Validations | Demandes en attente (badge sur l’onglet) ou toutes. Détail : outil, résumé, paramètres exacts, empreinte, risque, expiration. |
-| Réglages | Adresse, clé, test, suppression de la clé. |
+| Tâches | Automatisations et classement des fichiers (voir plus bas). |
+| Réglages | Adresse, clé, test, suppression de la clé ; voix ; bulle. |
+
+**Validations** : bouclier dans l’en-tête de chaque onglet, ambre avec le nombre de
+demandes en attente. Dans la discussion, une carte « Validation requise » n’apparaît
+que pour une demande réellement en attente ; « Voir la demande » ouvre son détail
+(outil, résumé, paramètres exacts, empreinte, risque, expiration).
+
+### Voix
+
+- **Dictée** : bouton micro à côté du champ (aussi dans le mini-chat). Le texte
+  reconnu (français) est placé dans le champ, à corriger puis à envoyer : rien
+  n’est envoyé automatiquement. Arrêter ou annuler pendant l’écoute ; un résultat
+  arrivé après l’annulation est ignoré.
+- Reconnaissance **sur l’appareil** quand le téléphone la propose en français
+  (Android 12+). Sinon, le service du téléphone peut envoyer l’audio à son éditeur :
+  il n’est utilisé qu’après l’avoir autorisé dans Réglages (son nom y est affiché).
+- Permission micro demandée au premier usage ; refus expliqué, lien vers les
+  réglages Android si le refus est définitif. Aucune écoute continue ni en arrière-
+  plan, aucun fichier audio : l’écoute s’arrête en quittant l’écran ou l’application
+  et avant toute lecture. La lecture en cours s’arrête avant d’écouter.
+- **Écouter** sur chaque réponse de NEXORA (Arrêter pendant la lecture), avec une
+  voix française hors ligne uniquement. Lecture automatique facultative, désactivée
+  par défaut.
+
+### Bulle (mini-chat)
+
+- Bulle de conversation Android (Android 11+), activée dans Réglages → Bulle. Pas
+  d’autorisation « Afficher par-dessus les autres applications ». Au premier essai,
+  Android peut demander de toucher l’icône de bulle de la notification NEXORA.
+- Mini-chat : discussion courante et son historique, saisie, dictée, envoi, écoute.
+  Agrandir ouvre l’application sur la même discussion avec le brouillon. Android
+  replie la bulle (icône, toucher à côté, Retour) ; il n’existe pas d’interface
+  pour qu’une application la replie elle-même.
+- Une demande sensible s’ouvre dans l’écran de validation habituel en plein écran ;
+  rien n’est approuvé ni exécuté depuis la bulle.
+- Les deux fenêtres partagent l’adresse, la clé et les brouillons ; pendant qu’une
+  fenêtre attend une réponse, l’autre ne peut pas envoyer dans la même discussion
+  et recharge l’historique ensuite.
+- Sans bulle : « Raccourci vers le chat » épingle un raccourci qui ouvre la
+  discussion.
 
 ### Validations
 
@@ -114,8 +153,11 @@ résultat GitHub Actions, issues ouvertes, dernier commit. Lecture seule.
 | `lib/src/storage/` | Stockage des identifiants (`flutter_secure_storage`). |
 | `lib/src/alerts/` | Alertes en arrière-plan : curseur des notifications du serveur, travail WorkManager, notifications locales. |
 | `lib/src/files/` | Classement des fichiers : accès au dossier choisi (canal vers `MainActivity.kt`), règles de proposition. |
-| `lib/src/state/` | État de l’application (`AppState`, badge) et d’une conversation (`ChatController`, garde contre le double envoi). |
-| `lib/src/ui/` | Écrans, thème, formats français. |
+| `lib/src/state/` | État de l’application (`AppState`, badge, connexion) et d’une conversation (`ChatController`, garde contre le double envoi, y compris entre les deux fenêtres). |
+| `lib/src/session/` | Brouillons et préférences partagés entre fenêtres (`SharedPreferencesAsync`) ; tour en cours partagé (`TurnLock`, canal vers `SessionHub.kt`). |
+| `lib/src/voice/` | Dictée et lecture (`VoiceController`, canal vers `VoiceBridge.kt` : `SpeechRecognizer`, `TextToSpeech`). |
+| `lib/src/bubble/` | Bulle (canal vers `BubbleBridge.kt`) ; le mini-chat tourne dans `BubbleActivity` avec le point d’entrée `bubbleMain`. |
+| `lib/src/ui/` | Écrans, mini-chat, cartes de résultats, thème (couleurs, espacements, rayons dans `theme.dart`), marque N (`design/nexora_mark.svg`), formats français. |
 | `test/` | Tests unitaires et d’écrans ; `test/support/fake_backend.dart` imite le backend en mémoire. |
 
 Dépendances figées (`pubspec.lock`) : `http`, `flutter_secure_storage`, `intl`,
@@ -138,14 +180,14 @@ Les tests n’ouvrent aucune connexion réseau et n’appellent jamais un fourni
 
 ### Essai sur émulateur avec un backend local simulé
 
-Lancer le backend avec `NEXORA_AI_PROVIDER=simulated` sur `127.0.0.1:8765` (voir
+Lancer le backend avec `NEXORA_AI_PROVIDER=simulated` sur `127.0.0.1:8000` (voir
 le README du dépôt), puis :
 
 ```sh
 flutter run --debug
 ```
 
-Dans l’application, adresse `http://10.0.2.2:8765` et la clé du backend local.
+Dans l’application, adresse `http://10.0.2.2:8000` et la clé du backend local.
 Ne jamais saisir la clé du serveur réel dans un émulateur partagé.
 
 ### APK de test

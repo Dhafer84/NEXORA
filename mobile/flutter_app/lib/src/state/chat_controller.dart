@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../api/api_client.dart';
 import '../api/api_error.dart';
 import '../api/models.dart';
+import '../session/session.dart';
 
 enum BannerTone { info, warning, error }
 
@@ -26,16 +29,40 @@ enum SendOutcome {
   /// Definitely not processed: the draft can be restored.
   rejected,
 
+  /// Not sent: the other NEXORA window is sending in this conversation.
+  busy,
+
   /// No answer received: maybe processed. Never resent automatically.
   uncertain,
 }
 
 /// One conversation: persisted history from the server and a single in-flight turn.
 class ChatController extends ChangeNotifier {
-  ChatController({required this.api, required this.conversationId});
+  ChatController({
+    required this.api,
+    required this.conversationId,
+    TurnLock? turns,
+    this.owner = 'app',
+  }) : turns = turns ?? MemoryTurnLock() {
+    _changes = this.turns.changes
+        .where((id) => id == conversationId)
+        .listen((_) => _otherWindowChanged());
+    unawaited(_otherWindowChanged());
+  }
 
   final NexoraApi api;
   final String conversationId;
+
+  /// Shared with the other NEXORA window: one message in flight at a time.
+  final TurnLock turns;
+  final String owner;
+  late final StreamSubscription<String> _changes;
+
+  /// Text being sent by the other window, shown as pending here.
+  String? otherWindowText;
+
+  /// The answer received for the last message sent from this window.
+  ChatMessage? lastReply;
 
   Conversation? conversation;
   List<ChatMessage> messages = const [];
@@ -46,6 +73,21 @@ class ChatController extends ChangeNotifier {
   bool _disposed = false;
 
   bool get sending => pendingText != null;
+
+  /// No message can be sent: this window or the other one waits for an answer.
+  bool get busy => sending || otherWindowText != null;
+
+  Future<void> _otherWindowChanged() async {
+    final turn = await turns.inFlight(conversationId);
+    if (_disposed) return;
+    final previous = otherWindowText;
+    otherWindowText = turn == null || turn.owner == owner ? null : turn.text;
+    _notify();
+    // The other window got its answer: show it here too.
+    if (previous != null && otherWindowText == null && !sending) {
+      await reload();
+    }
+  }
 
   Future<void> reload() async {
     loading = true;
@@ -74,9 +116,24 @@ class ChatController extends ChangeNotifier {
     if (content.isEmpty || sending) return SendOutcome.ignored;
     pendingText = content;
     banner = null;
+    lastReply = null;
     _notify();
+    if (otherWindowText != null ||
+        !await turns.begin(conversationId, owner, content)) {
+      pendingText = null;
+      banner = const ChatBanner(
+        BannerTone.warning,
+        'Un message est déjà en cours d’envoi dans l’autre fenêtre de NEXORA. '
+        'Le vôtre n’est pas envoyé : il reste dans le champ de saisie.',
+      );
+      _notify();
+      return SendOutcome.busy;
+    }
     try {
       final result = await api.sendMessage(conversationId, content);
+      lastReply = result.messages
+          .where((message) => message.role == 'assistant')
+          .lastOrNull;
       banner = switch (result.status) {
         'pending_approval' => ChatBanner(
           BannerTone.warning,
@@ -98,6 +155,7 @@ class ChatController extends ChangeNotifier {
       return _handleSendError(error);
     } finally {
       pendingText = null;
+      await turns.end(conversationId, owner);
       _notify();
     }
   }
@@ -167,6 +225,7 @@ class ChatController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _changes.cancel();
     super.dispose();
   }
 }

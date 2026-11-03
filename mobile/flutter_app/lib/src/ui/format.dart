@@ -60,6 +60,7 @@ const toolLabels = {
   'server_metrics': 'Métriques du serveur',
   'database_status': 'État de la base',
   'test_action': 'Action de test',
+  'github_report': 'Projets GitHub',
 };
 
 String toolLabel(String tool) => toolLabels[tool] ?? tool;

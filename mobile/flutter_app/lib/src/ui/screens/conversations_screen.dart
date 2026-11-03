@@ -4,12 +4,19 @@ import '../../api/api_error.dart';
 import '../../api/models.dart';
 import '../../state/app_state.dart';
 import '../format.dart';
+import '../theme.dart';
 import '../widgets/states.dart';
-import 'chat_screen.dart';
 
-/// Recent conversations stored on the server; any of them can be resumed.
+/// Asks for the title of a new conversation; null when cancelled.
+Future<String?> askConversationTitle(BuildContext context) =>
+    showDialog<String>(context: context, builder: (_) => const _TitleDialog());
+
+/// Recent conversations stored on the server. Picking one (or creating one)
+/// returns its id to the Messages screen, which opens it.
 class ConversationsScreen extends StatefulWidget {
-  const ConversationsScreen({super.key});
+  const ConversationsScreen({super.key, this.currentId});
+
+  final String? currentId;
 
   @override
   State<ConversationsScreen> createState() => _ConversationsScreenState();
@@ -42,10 +49,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
   Future<void> _create() async {
     if (_creating) return;
-    final title = await showDialog<String>(
-      context: context,
-      builder: (_) => const _TitleDialog(),
-    );
+    final title = await askConversationTitle(context);
     if (title == null || !mounted) return;
     setState(() => _creating = true);
     try {
@@ -65,12 +69,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     }
   }
 
-  Future<void> _open(String id) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => ChatScreen(conversationId: id)),
-    );
-    if (mounted) await _load();
-  }
+  Future<void> _open(String id) async => Navigator.of(context).pop(id);
 
   @override
   Widget build(BuildContext context) {
@@ -82,14 +81,14 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       body = const LoadingView(label: 'Chargement des conversations…');
     } else if (items.isEmpty) {
       body = MessageView(
-        icon: Icons.forum_outlined,
+        icon: Icons.forum_rounded,
         title: 'Aucune conversation',
         body:
             'Posez votre première question à NEXORA, par exemple : '
             '« Quelle est la charge du serveur ? »',
         action: FilledButton.icon(
           onPressed: _create,
-          icon: const Icon(Icons.add_comment_outlined),
+          icon: const Icon(Icons.add_comment_rounded),
           label: const Text('Nouvelle conversation'),
         ),
       );
@@ -97,14 +96,23 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       body = RefreshIndicator(
         onRefresh: _load,
         child: ListView.separated(
-          padding: const EdgeInsets.only(bottom: 88),
+          padding: const EdgeInsets.only(bottom: 88 + Space.l),
           itemCount: items.length,
           separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (context, index) {
             final item = items[index];
+            final current = item.id == widget.currentId;
             return ListTile(
-              leading: const CircleAvatar(
-                child: Icon(Icons.chat_bubble_outline),
+              selected: current,
+              leading: CircleAvatar(
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest,
+                child: Icon(
+                  current
+                      ? Icons.chat_rounded
+                      : Icons.chat_bubble_outline_rounded,
+                ),
               ),
               title: Text(
                 item.title,
@@ -112,7 +120,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text('Mise à jour ${formatShort(item.updatedAt)}'),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: current
+                  ? const Text('Ouverte')
+                  : const Icon(Icons.chevron_right_rounded),
               onTap: () => _open(item.id),
             );
           },
@@ -126,7 +136,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           IconButton(
             tooltip: 'Actualiser',
             onPressed: _load,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
@@ -135,7 +145,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           ? null
           : FloatingActionButton.extended(
               onPressed: _creating ? null : _create,
-              icon: const Icon(Icons.add_comment_outlined),
+              icon: const Icon(Icons.add_comment_rounded),
               label: const Text('Nouvelle'),
             ),
     );

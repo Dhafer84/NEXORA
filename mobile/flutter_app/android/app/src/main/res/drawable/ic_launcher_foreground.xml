@@ -1,14 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- NEXORA mark: a geometric "N" inside the 66 dp safe zone, drawn in vector form. -->
+<!-- Launcher foreground: the NEXORA N (design/nexora_mark.svg) in lavender on night blue. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M37,33h9l16,24.5V33h9v42h-9L46,50.5V75h-9Z"/>
-    <path
-        android:fillColor="#7FE0D8"
-        android:pathData="M73,71a4,4 0 1,1 0.01,0Z"/>
+    <group
+        android:scaleX="2.75"
+        android:scaleY="2.75"
+        android:translateX="21"
+        android:translateY="21">
+        <path
+            android:pathData="M7.6,16.6V7.4L16.4,16.6V7.4"
+            android:strokeColor="#B8A8FF"
+            android:strokeWidth="3.2"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"/>
+    </group>
 </vector>

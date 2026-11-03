@@ -10,6 +10,7 @@ import '../../api/models.dart';
 import '../../state/app_state.dart';
 import '../format.dart';
 import '../theme.dart';
+import '../widgets/header.dart';
 import '../widgets/states.dart';
 import 'files_screen.dart';
 
@@ -115,14 +116,14 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 24),
                 child: MessageView(
-                  icon: Icons.schedule,
+                  icon: Icons.schedule_rounded,
                   title: 'Aucune automatisation',
                   body:
                       'Programmez une vérification de l’espace disque du '
                       'serveur et recevez une alerte au-delà d’un seuil.',
                   action: FilledButton.icon(
                     onPressed: _create,
-                    icon: const Icon(Icons.add),
+                    icon: const Icon(Icons.add_rounded),
                     label: const Text('Programmer la vérification'),
                   ),
                 ),
@@ -132,12 +133,12 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
             if (AppScope.of(context).files != null)
               Card(
                 child: ListTile(
-                  leading: const Icon(Icons.drive_file_move_outline),
+                  leading: const Icon(Icons.drive_file_move_rounded),
                   title: const Text('Classer des fichiers du téléphone'),
                   subtitle: const Text(
                     'Propositions de rangement, chacune validée par vous.',
                   ),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => Navigator.of(context).push<void>(
                     MaterialPageRoute(builder: (_) => const FilesScreen()),
                   ),
@@ -149,21 +150,23 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
     }
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Automatisations'),
-        actions: [
-          IconButton(
-            tooltip: 'Actualiser',
-            onPressed: _load,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
+        title: const Text('Tâches'),
+        actions: headerActions(
+          extra: [
+            IconButton(
+              tooltip: 'Actualiser',
+              onPressed: _load,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          ],
+        ),
       ),
       body: list,
       floatingActionButton: items == null || items.isEmpty
           ? null
           : FloatingActionButton.extended(
               onPressed: _create,
-              icon: const Icon(Icons.add),
+              icon: const Icon(Icons.add_rounded),
               label: const Text('Nouvelle'),
             ),
     );
@@ -192,7 +195,7 @@ class _AutomationCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.storage_outlined),
+                  const Icon(Icons.storage_rounded),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -200,7 +203,7 @@ class _AutomationCard extends StatelessWidget {
                       style: theme.textTheme.titleMedium,
                     ),
                   ),
-                  const Icon(Icons.chevron_right),
+                  const Icon(Icons.chevron_right_rounded),
                 ],
               ),
               const SizedBox(height: 8),
@@ -231,23 +234,27 @@ class _AutomationCard extends StatelessWidget {
 
 List<Widget> _chips(Automation automation) => [
   automation.enabled
-      ? const StatusChip(label: 'Active', tone: 'ok', icon: Icons.schedule)
+      ? const StatusChip(
+          label: 'Active',
+          tone: 'ok',
+          icon: Icons.schedule_rounded,
+        )
       : const StatusChip(
           label: 'Suspendue',
           tone: 'neutral',
-          icon: Icons.pause_circle_outline,
+          icon: Icons.pause_circle_outline_rounded,
         ),
   if (automation.alertActive)
     const StatusChip(
       label: 'Au-dessus du seuil',
       tone: 'warning',
-      icon: Icons.warning_amber,
+      icon: Icons.warning_amber_rounded,
     ),
   if (automation.failing)
     const StatusChip(
       label: 'Mesure impossible',
       tone: 'error',
-      icon: Icons.error_outline,
+      icon: Icons.error_outline_rounded,
     ),
 ];
 
@@ -332,7 +339,7 @@ class _PhoneAlertsCardState extends State<PhoneAlertsCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SwitchListTile(
-              secondary: const Icon(Icons.notifications_active_outlined),
+              secondary: const Icon(Icons.notifications_active_rounded),
               title: const Text('Alertes sur ce téléphone'),
               subtitle: Text(subtitle),
               value: status?.enabled ?? false,
@@ -529,12 +536,12 @@ class _AutomationDetailScreenState extends State<AutomationDetailScreen> {
           IconButton(
             tooltip: 'Modifier',
             onPressed: _busy ? null : _edit,
-            icon: const Icon(Icons.edit_outlined),
+            icon: const Icon(Icons.edit_rounded),
           ),
           IconButton(
             tooltip: 'Supprimer',
             onPressed: _busy ? null : _delete,
-            icon: const Icon(Icons.delete_outline),
+            icon: const Icon(Icons.delete_outline_rounded),
           ),
         ],
       ),
@@ -599,7 +606,7 @@ class _AutomationDetailScreenState extends State<AutomationDetailScreen> {
                       children: [
                         FilledButton.icon(
                           onPressed: _busy ? null : _runNow,
-                          icon: const Icon(Icons.play_arrow),
+                          icon: const Icon(Icons.play_arrow_rounded),
                           label: const Text('Vérifier maintenant'),
                         ),
                         OutlinedButton.icon(
@@ -608,8 +615,8 @@ class _AutomationDetailScreenState extends State<AutomationDetailScreen> {
                               : () => _setEnabled(!automation.enabled),
                           icon: Icon(
                             automation.enabled
-                                ? Icons.pause
-                                : Icons.play_circle_outline,
+                                ? Icons.pause_rounded
+                                : Icons.play_circle_outline_rounded,
                           ),
                           label: Text(
                             automation.enabled ? 'Suspendre' : 'Reprendre',
@@ -682,9 +689,9 @@ class _RunTile extends StatelessWidget {
       child: ListTile(
         leading: Icon(
           switch (run.status) {
-            'ok' => Icons.check_circle_outline,
-            'alert' => Icons.warning_amber,
-            _ => Icons.error_outline,
+            'ok' => Icons.check_circle_outline_rounded,
+            'alert' => Icons.warning_amber_rounded,
+            _ => Icons.error_outline_rounded,
           },
           color: toneColors(theme.colorScheme, runTone(run.status)).foreground,
         ),
@@ -806,7 +813,7 @@ class _AutomationFormScreenState extends State<AutomationFormScreen> {
                 maxLength: 80,
                 decoration: const InputDecoration(
                   labelText: 'Nom',
-                  prefixIcon: Icon(Icons.label_outline),
+                  prefixIcon: Icon(Icons.label_outline_rounded),
                 ),
                 validator: (value) =>
                     (value ?? '').trim().isEmpty ? 'Indiquez un nom.' : null,
@@ -828,7 +835,7 @@ class _AutomationFormScreenState extends State<AutomationFormScreen> {
                   helperMaxLines: 3,
                   errorMaxLines: 3,
                   suffixText: '%',
-                  prefixIcon: Icon(Icons.warning_amber),
+                  prefixIcon: Icon(Icons.warning_amber_rounded),
                 ),
                 validator: (value) {
                   final number = _parseThreshold(value ?? '');
@@ -844,7 +851,7 @@ class _AutomationFormScreenState extends State<AutomationFormScreen> {
                 isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Fréquence',
-                  prefixIcon: Icon(Icons.schedule),
+                  prefixIcon: Icon(Icons.schedule_rounded),
                 ),
                 items: [
                   for (final minutes in automationIntervals)
@@ -885,7 +892,7 @@ class _AutomationFormScreenState extends State<AutomationFormScreen> {
                 ),
               FilledButton.icon(
                 onPressed: _busy ? null : _save,
-                icon: const Icon(Icons.save_outlined),
+                icon: const Icon(Icons.save_rounded),
                 label: Text(creating ? 'Programmer' : 'Enregistrer'),
               ),
             ],

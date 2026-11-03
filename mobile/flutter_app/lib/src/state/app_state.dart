@@ -6,8 +6,11 @@ import 'package:http/http.dart' as http;
 import '../api/api_client.dart';
 import '../alerts/background_alerts.dart';
 import '../api/api_error.dart';
+import '../bubble/bubble_service.dart';
 import '../files/file_access.dart';
+import '../session/session.dart';
 import '../storage/credentials_store.dart';
+import '../voice/voice_service.dart';
 
 typedef ApiFactory = NexoraApi Function(String baseUrl, String apiKey);
 
@@ -18,6 +21,9 @@ NexoraApi defaultApiFactory(String baseUrl, String apiKey) =>
     NexoraApi(baseUrl: baseUrl, apiKey: apiKey, client: http.Client());
 
 enum SetupState { loading, unconfigured, ready }
+
+/// Server reachability as shown in the header, from the last background check.
+enum ConnectionStatus { checking, connected, keyRefused, unreachable }
 
 class ConnectionReport {
   const ConnectionReport.success()
@@ -38,8 +44,15 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     this.alerts,
     this.files,
     this.folderMemory,
+    this.voice,
+    this.bubble,
+    TurnLock? turns,
+    SessionStore? session,
+    this.window = 'app',
     TimezoneProvider? timezone,
   }) : _apiFactory = apiFactory ?? defaultApiFactory,
+       turns = turns ?? MemoryTurnLock(),
+       session = session ?? MemorySessionStore(),
        timezone = timezone ?? (() async => 'Europe/Paris');
 
   final CredentialsStore store;
@@ -50,6 +63,21 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   /// Local file organisation in one user-picked folder; null where unsupported.
   final FileAccess? files;
   final FolderMemory? folderMemory;
+
+  /// Phone speech recognition and synthesis; null where unsupported.
+  final VoiceService? voice;
+
+  /// Conversation bubble and shortcut; null where unsupported.
+  final BubbleService? bubble;
+
+  /// In-flight messages shared with the other NEXORA window.
+  final TurnLock turns;
+
+  /// Drafts, current conversation and voice/bubble choices, shared too.
+  final SessionStore session;
+
+  /// `app` or `bubble`: owner name in [turns].
+  final String window;
   final TimezoneProvider timezone;
   final ApiFactory _apiFactory;
   final Duration pollInterval;
@@ -60,7 +88,12 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   NexoraApi? _api;
 
   int? pendingApprovals;
+
+  /// Ids of the approvals still pending: a chat card says "Validation requise"
+  /// only for these.
+  Set<String> pendingIds = const {};
   String? pendingError;
+  ConnectionStatus connection = ConnectionStatus.checking;
   Timer? _timer;
   bool _disposed = false;
 
@@ -142,6 +175,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _stopPolling();
     _replaceApi(null);
     pendingApprovals = null;
+    pendingIds = const {};
     try {
       await store.deleteApiKey();
     } finally {
@@ -157,11 +191,53 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       // Ignore an answer that arrives after the address or key changed.
       if (!identical(api, _api)) return;
       pendingApprovals = pending.length;
+      pendingIds = {for (final approval in pending) approval.id};
       pendingError = null;
+      connection = ConnectionStatus.connected;
     } on ApiError catch (error) {
       if (!identical(api, _api)) return;
       pendingError = error.message;
+      connection = switch (error.kind) {
+        ApiErrorKind.unauthorized => ConnectionStatus.keyRefused,
+        // Reachable, only this list is refused (permission or server error).
+        ApiErrorKind.forbidden ||
+        ApiErrorKind.server => ConnectionStatus.connected,
+        _ => ConnectionStatus.unreachable,
+      };
     }
+    _notify();
+  }
+
+  // ----- Shared chat session --------------------------------------------------
+
+  Future<String?> currentConversation() =>
+      session.getString(SessionKeys.currentConversation);
+
+  Future<void> setCurrentConversation(String id) =>
+      session.setString(SessionKeys.currentConversation, id);
+
+  Future<bool> allowRemoteRecognition() async =>
+      await session.getBool(SessionKeys.allowRemoteRecognition) ?? false;
+
+  Future<void> setAllowRemoteRecognition(bool value) async {
+    await session.setBool(SessionKeys.allowRemoteRecognition, value);
+    _notify();
+  }
+
+  /// Reading answers aloud automatically: off unless the user turns it on.
+  Future<bool> autoRead() async =>
+      await session.getBool(SessionKeys.autoRead) ?? false;
+
+  Future<void> setAutoRead(bool value) async {
+    await session.setBool(SessionKeys.autoRead, value);
+    _notify();
+  }
+
+  Future<bool> bubbleEnabled() async =>
+      await session.getBool(SessionKeys.bubbleEnabled) ?? false;
+
+  Future<void> setBubbleEnabled(bool value) async {
+    await session.setBool(SessionKeys.bubbleEnabled, value);
     _notify();
   }
 

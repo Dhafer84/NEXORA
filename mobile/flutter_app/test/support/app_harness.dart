@@ -6,13 +6,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:nexora/main.dart';
 import 'package:nexora/src/alerts/background_alerts.dart';
+import 'package:nexora/src/bubble/bubble_service.dart';
 import 'package:nexora/src/files/file_access.dart';
+import 'package:nexora/src/session/session.dart';
 import 'package:nexora/src/state/app_state.dart';
 import 'package:nexora/src/storage/credentials_store.dart';
+import 'package:nexora/src/voice/voice_service.dart';
 
 import 'fake_backend.dart';
 
-AppState? _current;
+final List<AppState> _started = [];
 
 /// Like [testWidgets], but stops the app state (and its polling timer) before
 /// the framework checks that no timer is left behind.
@@ -26,8 +29,10 @@ void testApp(String description, WidgetTesterCallback body) {
       await body(tester);
     } finally {
       await tester.pumpWidget(const SizedBox());
-      _current?.dispose();
-      _current = null;
+      for (final state in _started) {
+        state.dispose();
+      }
+      _started.clear();
     }
   });
 }
@@ -41,6 +46,42 @@ Future<AppState> pumpApp(
   AlertsController? alerts,
   FileAccess? files,
   FolderMemory? folderMemory,
+  VoiceService? voice,
+  BubbleService? bubble,
+  TurnLock? turns,
+  SessionStore? session,
+}) async {
+  final state = await startState(
+    backend,
+    configured: configured,
+    alerts: alerts ?? FakeAlerts(),
+    files: files,
+    folderMemory: folderMemory,
+    voice: voice,
+    bubble: bubble,
+    turns: turns,
+    session: session,
+  );
+  await tester.pumpWidget(NexoraApp(state: state, themeMode: themeMode));
+  await state.load();
+  await tester.pumpAndSettle();
+  return state;
+}
+
+/// An application state against [backend], disposed at the end of the test.
+/// Several states sharing [turns] and [session] stand for the two NEXORA
+/// windows (full app and bubble).
+Future<AppState> startState(
+  FakeBackend backend, {
+  bool configured = true,
+  AlertsController? alerts,
+  FileAccess? files,
+  FolderMemory? folderMemory,
+  VoiceService? voice,
+  BubbleService? bubble,
+  TurnLock? turns,
+  SessionStore? session,
+  String window = 'app',
 }) async {
   await initializeDateFormatting('fr_FR');
   FlutterSecureStorage.setMockInitialValues(
@@ -56,16 +97,18 @@ Future<AppState> pumpApp(
   final state = AppState(
     store: SecureCredentialsStore(),
     apiFactory: backend.factory,
-    alerts: alerts ?? FakeAlerts(),
+    alerts: alerts,
     files: files,
     folderMemory: folderMemory,
+    voice: voice,
+    bubble: bubble,
+    turns: turns,
+    session: session,
+    window: window,
     timezone: () async => 'Europe/Paris',
   );
-  _current = state;
-  await tester.pumpWidget(NexoraApp(state: state, themeMode: themeMode));
-  await state.load();
-  await tester.pumpAndSettle();
-  return _current = state;
+  _started.add(state);
+  return state;
 }
 
 /// Phone alerts without Android: records what the app asked for.

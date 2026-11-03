@@ -158,7 +158,7 @@ class _ApprovalDetailScreenState extends State<ApprovalDetailScreen> {
           IconButton(
             tooltip: 'Actualiser le statut',
             onPressed: _busy ? null : _load,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
@@ -194,7 +194,7 @@ class _ApprovalDetailScreenState extends State<ApprovalDetailScreen> {
                   : approval.risk == 'high'
                   ? 'error'
                   : 'warning',
-              icon: Icons.shield_outlined,
+              icon: Icons.shield_rounded,
             ),
           ],
         ),
@@ -244,7 +244,7 @@ class _ApprovalDetailScreenState extends State<ApprovalDetailScreen> {
           const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: () => _openConversation(approval.conversationId!),
-            icon: const Icon(Icons.forum_outlined),
+            icon: const Icon(Icons.forum_rounded),
             label: const Text('Ouvrir la conversation'),
           ),
         ],
@@ -267,12 +267,12 @@ class _ApprovalDetailScreenState extends State<ApprovalDetailScreen> {
             children: [
               FilledButton.icon(
                 onPressed: disabled ? null : () => _approve(approval),
-                icon: const Icon(Icons.check),
+                icon: const Icon(Icons.check_rounded),
                 label: const Text('Approuver'),
               ),
               OutlinedButton.icon(
                 onPressed: disabled ? null : () => _reject(approval),
-                icon: const Icon(Icons.block),
+                icon: const Icon(Icons.block_rounded),
                 label: const Text('Refuser'),
               ),
             ],
@@ -290,12 +290,12 @@ class _ApprovalDetailScreenState extends State<ApprovalDetailScreen> {
             children: [
               FilledButton.icon(
                 onPressed: disabled ? null : () => _execute(approval),
-                icon: const Icon(Icons.play_arrow),
+                icon: const Icon(Icons.play_arrow_rounded),
                 label: const Text('Exécuter maintenant'),
               ),
               OutlinedButton.icon(
                 onPressed: disabled ? null : () => _reject(approval),
-                icon: const Icon(Icons.block),
+                icon: const Icon(Icons.block_rounded),
                 label: const Text('Révoquer'),
               ),
             ],
@@ -309,7 +309,7 @@ class _ApprovalDetailScreenState extends State<ApprovalDetailScreen> {
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
                 onPressed: disabled ? null : () => _showStored(approval),
-                icon: const Icon(Icons.receipt_long_outlined),
+                icon: const Icon(Icons.receipt_long_rounded),
                 label: const Text('Afficher le résultat enregistré'),
               ),
             ),
@@ -365,7 +365,7 @@ class _Note extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Icon(Icons.info_outline, size: 20),
+      const Icon(Icons.info_outline_rounded, size: 20),
       const SizedBox(width: 8),
       Expanded(child: Text(text)),
     ],

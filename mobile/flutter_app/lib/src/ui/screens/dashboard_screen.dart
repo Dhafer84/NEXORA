@@ -4,6 +4,7 @@ import '../../api/api_error.dart';
 import '../../api/models.dart';
 import '../../state/app_state.dart';
 import '../format.dart';
+import '../widgets/header.dart';
 import '../widgets/states.dart';
 
 /// Each probe is loaded and reported independently: one refusal or failure
@@ -76,14 +77,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final metrics = _metrics.value;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tableau de bord'),
-        actions: [
-          IconButton(
-            tooltip: 'Actualiser',
-            onPressed: _load,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
+        title: const Text('Serveur'),
+        actions: headerActions(
+          extra: [
+            IconButton(
+              tooltip: 'Actualiser',
+              onPressed: _load,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          ],
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _load,
@@ -91,14 +94,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           padding: const EdgeInsets.all(12),
           children: [
             _StatusTile(
-              icon: Icons.cloud_done_outlined,
+              icon: Icons.cloud_done_rounded,
               title: 'Serveur NEXORA',
               probe: _live,
               okText: 'Disponible',
             ),
             const SizedBox(height: 8),
             _StatusTile(
-              icon: Icons.storage_outlined,
+              icon: Icons.storage_rounded,
               title: 'Base PostgreSQL',
               probe: _ready,
               okText: 'Disponible',
@@ -106,7 +109,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 8),
             _Section(
               title: 'Ressources du serveur',
-              icon: Icons.speed,
+              icon: Icons.speed_rounded,
               loading: _metrics.loading && metrics == null,
               error: _metrics.error,
               child: metrics == null
@@ -144,7 +147,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 8),
             _Section(
               title: 'Assistant IA',
-              icon: Icons.smart_toy_outlined,
+              icon: Icons.smart_toy_rounded,
               loading: _ai.loading && _ai.value == null,
               error: _ai.error,
               child: _ai.value == null ? null : _AiDetails(status: _ai.value!),
@@ -152,7 +155,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 8),
             _Section(
               title: 'Projets GitHub',
-              icon: Icons.code,
+              icon: Icons.code_rounded,
               loading: _github.loading && _github.value == null,
               error: _github.error,
               child: _github.value == null
@@ -291,15 +294,7 @@ class _Gauge extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: (percent / 100).clamp(0, 1),
-                minHeight: 8,
-                color: high ? scheme.error : scheme.primary,
-                backgroundColor: scheme.surfaceContainerHighest,
-              ),
-            ),
+            GaugeBar(percent: percent, height: 8),
             if (detail != null)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
@@ -400,7 +395,7 @@ class _GitHubDetails extends StatelessWidget {
                       if (repo.runs.isNotEmpty) _runChip(repo.runs.first),
                       StatusChip(
                         label: '${repo.openIssues ?? 0} issue(s) ouverte(s)',
-                        icon: Icons.bug_report_outlined,
+                        icon: Icons.bug_report_rounded,
                       ),
                     ],
                   ),
@@ -426,14 +421,17 @@ class _GitHubDetails extends StatelessWidget {
       'success' => StatusChip(
         label: '$name : réussi',
         tone: 'ok',
-        icon: Icons.check,
+        icon: Icons.check_rounded,
       ),
-      null => StatusChip(label: '$name : en cours', icon: Icons.timelapse),
+      null => StatusChip(
+        label: '$name : en cours',
+        icon: Icons.timelapse_rounded,
+      ),
       _ => StatusChip(
         label:
             '$name : ${run.conclusion == 'failure' ? 'échec' : run.conclusion}',
         tone: 'error',
-        icon: Icons.close,
+        icon: Icons.close_rounded,
       ),
     };
   }

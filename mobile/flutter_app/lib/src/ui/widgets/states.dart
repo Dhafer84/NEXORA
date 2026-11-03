@@ -75,8 +75,8 @@ class ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MessageView(
     icon: error.kind == ApiErrorKind.forbidden
-        ? Icons.lock_outline
-        : Icons.cloud_off_outlined,
+        ? Icons.lock_outline_rounded
+        : Icons.cloud_off_rounded,
     title: error.kind == ApiErrorKind.forbidden
         ? 'Accès refusé'
         : 'Impossible de charger',
@@ -85,7 +85,7 @@ class ErrorView extends StatelessWidget {
         ? null
         : FilledButton.tonalIcon(
             onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             label: const Text('Réessayer'),
           ),
   );
@@ -159,20 +159,29 @@ class NoticeBar extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              tone == 'error' ? Icons.error_outline : Icons.info_outline,
+              tone == 'error'
+                  ? Icons.error_outline_rounded
+                  : Icons.info_outline_rounded,
               color: colors.foreground,
             ),
             const SizedBox(width: 12),
+            // The action sits under the text: long messages and large text
+            // never squeeze it into a narrow column.
             Expanded(
-              child: Text(message, style: TextStyle(color: colors.foreground)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(message, style: TextStyle(color: colors.foreground)),
+                  if (actionLabel != null)
+                    TextButton(onPressed: onAction, child: Text(actionLabel!)),
+                ],
+              ),
             ),
-            if (actionLabel != null)
-              TextButton(onPressed: onAction, child: Text(actionLabel!)),
             if (onClose != null)
               IconButton(
                 tooltip: 'Fermer le message',
                 onPressed: onClose,
-                icon: Icon(Icons.close, color: colors.foreground),
+                icon: Icon(Icons.close_rounded, color: colors.foreground),
               ),
           ],
         ),
@@ -194,3 +203,31 @@ const statusTones = {
   'failed': 'error',
   'timed_out': 'error',
 };
+
+/// Rounded usage bar of the chat cards and the dashboard (0–100 %).
+class GaugeBar extends StatelessWidget {
+  const GaugeBar({super.key, required this.percent, this.height = 10});
+
+  final double percent;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final colors = NexoraColors.of(context);
+    final color = percent >= 90
+        ? scheme.error
+        : percent >= 80
+        ? colors.warning
+        : scheme.primary;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(Radii.pill),
+      child: LinearProgressIndicator(
+        value: (percent / 100).clamp(0, 1),
+        minHeight: height,
+        color: color,
+        backgroundColor: colors.gaugeTrack,
+      ),
+    );
+  }
+}

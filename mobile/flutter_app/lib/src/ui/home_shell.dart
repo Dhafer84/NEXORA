@@ -1,10 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../bubble/bubble_service.dart';
 import '../state/app_state.dart';
-import 'screens/approvals_screen.dart';
+import 'screens/approval_detail_screen.dart';
 import 'screens/automations_screen.dart';
-import 'screens/conversations_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/messages_screen.dart';
 import 'screens/settings_screen.dart';
 
 /// Root of the configured application, or the first-run settings screen.
@@ -16,7 +19,55 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  int _index = 0;
+  static const _messages = 0;
+  static const _settings = 3;
+  int _index = _messages;
+  StreamSubscription<LaunchRequest>? _launches;
+
+  @override
+  void initState() {
+    super.initState();
+    _launches = AppScope.read(context).bubble?.launches.listen(_launch);
+  }
+
+  @override
+  void dispose() {
+    _launches?.cancel();
+    super.dispose();
+  }
+
+  /// A shortcut or the mini-chat asked for a conversation or an approval.
+  Future<void> _launch(LaunchRequest request) async {
+    final state = AppScope.read(context);
+    if (state.setup != SetupState.ready) return;
+    final conversation = request.conversationId;
+    if (conversation != null) await state.setCurrentConversation(conversation);
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    setState(() => _index = _messages);
+    final approval = request.approvalId;
+    if (approval != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ApprovalDetailScreen(approvalId: approval),
+        ),
+      );
+      await state.refreshPending();
+    }
+  }
+
+  Future<void> _openBubble(String conversationId) async {
+    final state = AppScope.read(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final problem = await state.bubble!.show(
+      conversationId: conversationId,
+      title: 'NEXORA',
+      expand: true,
+    );
+    if (problem != null) {
+      messenger.showSnackBar(SnackBar(content: Text(problem)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,13 +80,14 @@ class _HomeShellState extends State<HomeShell> {
       case SetupState.ready:
         break;
     }
-    final pending = state.pendingApprovals ?? 0;
     // Screens are rebuilt per tab so each one reloads fresh server data when shown.
     final screens = [
-      const ConversationsScreen(),
+      MessagesScreen(
+        onVoiceSettings: () => setState(() => _index = _settings),
+        onOpenBubble: state.bubble == null ? null : _openBubble,
+      ),
       const DashboardScreen(),
       const AutomationsScreen(),
-      const ApprovalsScreen(),
       const SettingsScreen(),
     ];
     return Scaffold(
@@ -43,41 +95,25 @@ class _HomeShellState extends State<HomeShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (index) => setState(() => _index = index),
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.forum_outlined),
-            selectedIcon: Icon(Icons.forum),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.chat_outlined),
+            selectedIcon: Icon(Icons.chat_rounded),
             label: 'Messages',
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.monitor_heart_outlined),
-            selectedIcon: Icon(Icons.monitor_heart),
+          NavigationDestination(
+            icon: Icon(Icons.dns_outlined),
+            selectedIcon: Icon(Icons.dns_rounded),
             label: 'Serveur',
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.schedule_outlined),
-            selectedIcon: Icon(Icons.schedule),
+          NavigationDestination(
+            icon: Icon(Icons.check_box_outlined),
+            selectedIcon: Icon(Icons.check_box_rounded),
             label: 'Tâches',
           ),
           NavigationDestination(
-            icon: Badge(
-              isLabelVisible: pending > 0,
-              label: Text('$pending'),
-              child: const Icon(Icons.fact_check_outlined),
-            ),
-            selectedIcon: Badge(
-              isLabelVisible: pending > 0,
-              label: Text('$pending'),
-              child: const Icon(Icons.fact_check),
-            ),
-            label: 'Validations',
-            tooltip: pending > 0
-                ? '$pending validation(s) en attente'
-                : 'Validations',
-          ),
-          const NavigationDestination(
             icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
+            selectedIcon: Icon(Icons.settings_rounded),
             label: 'Réglages',
           ),
         ],

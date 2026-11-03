@@ -23,11 +23,40 @@ class MainActivity : FlutterActivity() {
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private var pendingPick: MethodChannel.Result? = null
+    private var voice: VoiceBridge? = null
+    private var bubble: BubbleBridge? = null
+    private var session: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.nexora/files")
-            .setMethodCallHandler(::handle)
+        val messenger = flutterEngine.dartExecutor.binaryMessenger
+        MethodChannel(messenger, "app.nexora/files").setMethodCallHandler(::handle)
+        voice = VoiceBridge(this, messenger)
+        bubble = BubbleBridge(this, messenger, inBubble = false)
+        session = SessionHub.attach(messenger, "app")
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        bubble?.onNewIntent(intent)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (voice?.onPermissionResult(requestCode, grantResults) != true) {
+            bubble?.onPermissionResult(requestCode)
+        }
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        voice?.dispose()
+        bubble?.dispose()
+        session?.let(SessionHub::detach)
+        voice = null
+        bubble = null
+        session = null
+        super.cleanUpFlutterEngine(flutterEngine)
     }
 
     private fun handle(call: MethodCall, result: MethodChannel.Result) {

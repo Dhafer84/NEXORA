@@ -158,7 +158,7 @@ class _FilesScreenState extends State<FilesScreen> {
       body = const LoadingView();
     } else if (folder == null) {
       body = MessageView(
-        icon: Icons.folder_open,
+        icon: Icons.folder_open_rounded,
         title: 'Choisissez un dossier',
         body:
             'NEXORA n’accède qu’au dossier que vous choisissez (par exemple '
@@ -167,7 +167,7 @@ class _FilesScreenState extends State<FilesScreen> {
             'Rien n’est supprimé ni envoyé au serveur.',
         action: FilledButton.icon(
           onPressed: _pick,
-          icon: const Icon(Icons.folder_open),
+          icon: const Icon(Icons.folder_open_rounded),
           label: const Text('Choisir un dossier'),
         ),
       );
@@ -185,7 +185,7 @@ class _FilesScreenState extends State<FilesScreen> {
               ),
             Card(
               child: ListTile(
-                leading: const Icon(Icons.folder_outlined),
+                leading: const Icon(Icons.folder_rounded),
                 title: Text(folder.name),
                 subtitle: Text(
                   items == null
@@ -270,8 +270,8 @@ class _FilesScreenState extends State<FilesScreen> {
                 ListTile(
                   leading: Icon(
                     outcome.ok
-                        ? Icons.check_circle_outline
-                        : Icons.error_outline,
+                        ? Icons.check_circle_outline_rounded
+                        : Icons.error_outline_rounded,
                   ),
                   title: Text(outcome.text),
                   subtitle: Text(formatShort(outcome.at)),
