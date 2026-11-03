@@ -240,6 +240,61 @@ def test_failures_are_recorded_and_notified_once(db_settings):
     assert all(run.finished_at >= run.started_at for run in history(db_settings, task.id))
 
 
+def test_phone_reading_between_two_commits_misses_no_alert(db_settings):
+    # Two alerts are raised by concurrent transactions. The first one numbered
+    # commits last; the phone reads between the two commits, keeps the highest id
+    # it saw, then reads again from there. It must end up with both alerts.
+    first, second = create(db_settings, name="Premier"), create(db_settings, name="Second")
+    numbered = {name: threading.Event() for name in ("first", "second")}
+    commit = {name: threading.Event() for name in ("first", "second")}
+    errors = []
+
+    def alert(name, task):
+        try:
+            with connect(db_settings) as connection, connection.transaction():
+                automations.run_now(connection, task.id, db_settings, Probe(95))
+                numbered[name].set()
+                assert commit[name].wait(10)
+        except BaseException as error:  # noqa: BLE001 - reported by the main thread.
+            errors.append(error)
+
+    threads = {
+        name: threading.Thread(target=alert, args=(name, task))
+        for name, task in (("first", first), ("second", second))
+    }
+    seen, cursor = [], 0
+
+    def read():
+        nonlocal cursor
+        with connect(db_settings) as connection:
+            page = automations.notifications(connection, cursor, 100)
+        seen.extend(item.id for item in page.items)
+        cursor = max([cursor, *seen])
+        assert page.latest_id == cursor
+
+    try:
+        threads["first"].start()
+        assert numbered["first"].wait(5)
+        threads["second"].start()
+        # Numbered only once the first is committed: it cannot commit before it.
+        second_numbered_early = numbered["second"].wait(1)
+        commit["second"].set()
+        threads["second"].join(1)
+        read()  # Between the two commits.
+    finally:
+        commit["first"].set()
+        commit["second"].set()
+        for thread in threads.values():
+            thread.join(10)
+    assert not errors
+    read()
+    everything = notices(db_settings)
+    assert len(everything) == 2
+    assert seen == [notice.id for notice in everything]
+    assert [notice.body.split(" »")[0] for notice in everything] == ["« Premier", "« Second"]
+    assert not second_numbered_early
+
+
 def test_threshold_change_rearms_the_alert(db_settings):
     task = create(db_settings, threshold_percent=80)
     clock = Clock(T0 + timedelta(hours=1))

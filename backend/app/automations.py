@@ -39,6 +39,8 @@ logger = logging.getLogger("nexora")
 INTERVALS = (15, 30, 60, 120, 180, 360, 720, 1440)
 MAX_AUTOMATIONS = 20
 MAX_CATCH_UP_DAYS = 400
+# pg_advisory_xact_lock key serializing notification numbering (arbitrary, app-wide).
+NOTIFICATION_LOCK = 0x4E58_4E4F
 Interval = Literal[15, 30, 60, 120, 180, 360, 720, 1440]
 Measure = Callable[[], ServerMetrics]
 Clock = Callable[[], datetime]
@@ -318,14 +320,24 @@ def runs(connection: psycopg.Connection, automation_id: UUID, limit: int) -> lis
 
 
 def notifications(connection: psycopg.Connection, after_id: int, limit: int) -> NotificationPage:
+    # One statement, one snapshot: latest_id never exceeds what the page could show.
     rows = connection.execute(
-        "SELECT * FROM notifications WHERE id > %s ORDER BY id LIMIT %s", (after_id, limit)
+        """SELECT n.*, latest.id AS latest_id
+           FROM (SELECT coalesce(max(id), 0) AS id FROM notifications) AS latest
+           LEFT JOIN LATERAL (
+               SELECT * FROM notifications WHERE id > %s ORDER BY id LIMIT %s
+           ) AS n ON true
+           ORDER BY n.id""",
+        (after_id, limit),
     ).fetchall()
-    latest = connection.execute("SELECT coalesce(max(id), 0) AS id FROM notifications").fetchone()
     fields = NotificationView.model_fields
     return NotificationPage(
-        items=[NotificationView(**{key: row[key] for key in fields}) for row in rows],
-        latest_id=latest["id"],
+        items=[
+            NotificationView(**{key: row[key] for key in fields})
+            for row in rows
+            if row["id"] is not None
+        ],
+        latest_id=rows[0]["latest_id"],
     )
 
 
@@ -424,16 +436,21 @@ def _evaluate(
             notice is not None,
         ),
     ).fetchone()
+    connection.execute(
+        "UPDATE automations SET alert_active = %s, failing = %s, last_run_at = %s WHERE id = %s",
+        (alert_active, failing, started, row["id"]),
+    )
     if notice:
+        # Phones read notifications by increasing id and keep the last one seen:
+        # ids must become visible in order. The lock is held until commit, so a
+        # notification is numbered only once every earlier one is committed or
+        # rolled back. Last statement of the transaction: held for its commit only.
+        connection.execute("SELECT pg_advisory_xact_lock(%s)", (NOTIFICATION_LOCK,))
         connection.execute(
             """INSERT INTO notifications (level, title, body, automation_id, run_id)
                VALUES (%s, %s, %s, %s, %s)""",
             (*notice, row["id"], run["id"]),
         )
-    connection.execute(
-        "UPDATE automations SET alert_active = %s, failing = %s, last_run_at = %s WHERE id = %s",
-        (alert_active, failing, started, row["id"]),
-    )
     logger.info(
         "automation_run automation=%s trigger=%s status=%s notified=%s",
         row["id"],
