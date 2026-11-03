@@ -8,6 +8,7 @@ import '../alerts/background_alerts.dart';
 import '../api/api_error.dart';
 import '../bubble/bubble_service.dart';
 import '../files/file_access.dart';
+import '../health/health_service.dart';
 import '../session/session.dart';
 import '../storage/credentials_store.dart';
 import '../voice/voice_service.dart';
@@ -46,6 +47,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     this.folderMemory,
     this.voice,
     this.bubble,
+    this.health,
     TurnLock? turns,
     SessionStore? session,
     this.window = 'app',
@@ -69,6 +71,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Conversation bubble and shortcut; null where unsupported.
   final BubbleService? bubble;
+
+  /// Local Health Connect diagnostic (step 5 prototype); null where
+  /// unsupported. Its readings stay in the screen, never in this state.
+  final HealthService? health;
 
   /// In-flight messages shared with the other NEXORA window.
   final TurnLock turns;

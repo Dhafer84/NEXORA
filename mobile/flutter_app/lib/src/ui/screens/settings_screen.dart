@@ -4,6 +4,7 @@ import '../../api/api_client.dart';
 import '../../state/app_state.dart';
 import '../widgets/header.dart';
 import '../widgets/states.dart';
+import 'health_diagnostic_screen.dart';
 import 'voice_bubble_settings.dart';
 
 /// Backend address and personal key. The stored key is never displayed again.
@@ -253,6 +254,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const VoiceSettings(),
               if (!widget.firstRun && state.bubble != null)
                 const BubbleSettings(),
+              // Local only: available before the server is configured.
+              if (state.health != null) ...[
+                const SizedBox(height: 24),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.monitor_heart_rounded),
+                  title: const Text('Diagnostic santé (prototype)'),
+                  subtitle: const Text(
+                    'Lire les pas, le sommeil, le cœur et les entraînements de '
+                    'Health Connect. Les données restent sur ce téléphone.',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          HealthDiagnosticScreen(service: state.health!),
+                    ),
+                  ),
+                ),
+              ],
               if (state.hasKey) ...[
                 const SizedBox(height: 32),
                 const Divider(),

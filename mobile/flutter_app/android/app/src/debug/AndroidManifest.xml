@@ -4,6 +4,12 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Debug only: sample health entries written by NEXORA itself, to try the
+         health diagnostic on an emulator. Release builds only read. -->
+    <uses-permission android:name="android.permission.health.WRITE_STEPS"/>
+    <uses-permission android:name="android.permission.health.WRITE_SLEEP"/>
+    <uses-permission android:name="android.permission.health.WRITE_HEART_RATE"/>
+    <uses-permission android:name="android.permission.health.WRITE_EXERCISE"/>
     <!-- Debug only: HTTP to the emulator host for the local simulated backend. -->
     <application android:networkSecurityConfig="@xml/network_security_config"/>
 </manifest>

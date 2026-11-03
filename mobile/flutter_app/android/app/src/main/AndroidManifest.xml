@@ -7,6 +7,12 @@
     <!-- Dictation, one utterance per tap, asked at first use. No background
          recording and no audio file: see VoiceBridge.kt. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Health Connect, read only, one permission per category, asked from the
+         local health diagnostic (HealthBridge.kt). Data stays on the phone. -->
+    <uses-permission android:name="android.permission.health.READ_STEPS"/>
+    <uses-permission android:name="android.permission.health.READ_SLEEP"/>
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE"/>
+    <uses-permission android:name="android.permission.health.READ_EXERCISE"/>
     <!-- No backup: the personal key must stay in this device's Keystore. Cleartext
          traffic stays disabled (default for targetSdk >= 28); only debug builds
          allow HTTP to the emulator host, see src/debug. -->
@@ -53,6 +59,26 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize"/>
+        <!-- How health data is used: opened by Health Connect from its permission
+             screens (Android 13 and older, then Android 14+ through the alias). -->
+        <activity
+            android:name=".HealthPrivacyActivity"
+            android:exported="true"
+            android:label="NEXORA — données de santé">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/>
+            </intent-filter>
+        </activity>
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".HealthPrivacyActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE"/>
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS"/>
+            </intent-filter>
+        </activity-alias>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -65,6 +91,8 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- Health Connect app (Android 13 and older). -->
+        <package android:name="com.google.android.apps.healthdata"/>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

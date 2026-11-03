@@ -8,6 +8,7 @@ import 'package:nexora/main.dart';
 import 'package:nexora/src/alerts/background_alerts.dart';
 import 'package:nexora/src/bubble/bubble_service.dart';
 import 'package:nexora/src/files/file_access.dart';
+import 'package:nexora/src/health/health_service.dart';
 import 'package:nexora/src/session/session.dart';
 import 'package:nexora/src/state/app_state.dart';
 import 'package:nexora/src/storage/credentials_store.dart';
@@ -48,6 +49,7 @@ Future<AppState> pumpApp(
   FolderMemory? folderMemory,
   VoiceService? voice,
   BubbleService? bubble,
+  HealthService? health,
   TurnLock? turns,
   SessionStore? session,
 }) async {
@@ -59,6 +61,7 @@ Future<AppState> pumpApp(
     folderMemory: folderMemory,
     voice: voice,
     bubble: bubble,
+    health: health,
     turns: turns,
     session: session,
   );
@@ -79,6 +82,7 @@ Future<AppState> startState(
   FolderMemory? folderMemory,
   VoiceService? voice,
   BubbleService? bubble,
+  HealthService? health,
   TurnLock? turns,
   SessionStore? session,
   String window = 'app',
@@ -102,6 +106,7 @@ Future<AppState> startState(
     folderMemory: folderMemory,
     voice: voice,
     bubble: bubble,
+    health: health,
     turns: turns,
     session: session,
     window: window,

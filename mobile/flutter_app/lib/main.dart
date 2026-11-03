@@ -7,6 +7,7 @@ import 'src/alerts/background_alerts.dart';
 import 'src/bubble/bubble_service.dart';
 import 'src/files/file_access.dart';
 import 'src/files/folder_memory.dart';
+import 'src/health/health_service.dart';
 import 'src/session/session.dart';
 import 'src/state/app_state.dart';
 import 'src/storage/credentials_store.dart';
@@ -25,6 +26,7 @@ Future<void> main() async {
     folderMemory: PreferencesFolderMemory(),
     voice: NativeVoiceService(),
     bubble: NativeBubbleService(),
+    health: NativeHealthService(),
     turns: NativeTurnLock(),
     session: PreferencesSessionStore(),
     timezone: () async => (await FlutterTimezone.getLocalTimezone()).identifier,

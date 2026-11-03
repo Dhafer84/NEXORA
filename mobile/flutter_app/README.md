@@ -128,6 +128,32 @@ résultat GitHub Actions, issues ouvertes, dernier commit. Lecture seule.
   stockage qui refuse le déplacement donne une erreur sans modification. Chaque
   résultat est rapporté dans « Opérations effectuées ».
 
+### Diagnostic santé (Réglages, prototype de l’étape 5)
+
+- Lit **Health Connect** sur le téléphone (Android 14 et plus : intégré ; avant :
+  application Health Connect). Accessible aussi avant la configuration du
+  serveur : il n’en a pas besoin.
+- **Une permission de lecture par catégorie**, demandée seulement quand on
+  appuie sur son bouton : pas d’abord ; sommeil, fréquence cardiaque et
+  entraînements après une lecture des pas réussie. Aucune permission d’écriture
+  en release (les versions de débogage peuvent écrire des entrées d’essai de
+  NEXORA pour l’émulateur).
+- Une **journée terminée** (hier par défaut, jamais aujourd’hui), de 00:00 à
+  24:00 dans le fuseau du téléphone, affiché à l’écran.
+- Pour chaque catégorie : *Données lues*, *Permission refusée*, *Aucune donnée
+  disponible*, *Health Connect indisponible* ou erreur de lecture.
+- Pas : total des entrées de **Health Sync** (paquet `nl.appyhapps.healthsync`,
+  à confirmer sur l’appareil), total Health Connect (doublons retirés selon la
+  priorité des applications), somme brute, détail par application et appareil
+  (paquet, nombre d’entrées, heures) et **avertissement de chevauchement** quand
+  deux sources couvrent la même période (pour ne pas additionner la montre et le
+  téléphone).
+- *Historique accessible* : date de la plus ancienne entrée lisible.
+- **Confidentialité** : valeurs gardées en mémoire de l’écran seulement ; aucune
+  écriture sur disque, aucun journal (Dart ou Kotlin), aucun envoi au serveur
+  NEXORA ni au fournisseur IA. Titres et notes des entraînements ne sont pas lus.
+  `HealthPrivacyActivity` explique cet usage depuis Health Connect.
+
 ## Sécurité
 
 - Adresse et clé enregistrées ensemble dans une seule entrée du stockage sécurisé,
@@ -156,13 +182,14 @@ résultat GitHub Actions, issues ouvertes, dernier commit. Lecture seule.
 | `lib/src/state/` | État de l’application (`AppState`, badge, connexion) et d’une conversation (`ChatController`, garde contre le double envoi, y compris entre les deux fenêtres). |
 | `lib/src/session/` | Brouillons et préférences partagés entre fenêtres (`SharedPreferencesAsync`) ; tour en cours partagé (`TurnLock`, canal vers `SessionHub.kt`). |
 | `lib/src/voice/` | Dictée et lecture (`VoiceController`, canal vers `VoiceBridge.kt` : `SpeechRecognizer`, `TextToSpeech`). |
+| `lib/src/health/` | Diagnostic Health Connect : canal vers `HealthBridge.kt` (permissions, lecture d’une journée, agrégats), classement des sources et chevauchements (`health_summary.dart`). |
 | `lib/src/bubble/` | Bulle (canal vers `BubbleBridge.kt`) ; le mini-chat tourne dans `BubbleActivity` avec le point d’entrée `bubbleMain`. |
 | `lib/src/ui/` | Écrans, mini-chat, cartes de résultats, thème (couleurs, espacements, rayons dans `theme.dart`), marque N (`design/nexora_mark.svg`), formats français. |
 | `test/` | Tests unitaires et d’écrans ; `test/support/fake_backend.dart` imite le backend en mémoire. |
 
 Dépendances figées (`pubspec.lock`) : `http`, `flutter_secure_storage`, `intl`,
 `flutter_localizations`, `workmanager`, `flutter_local_notifications`,
-`flutter_timezone`, `shared_preferences`. Gestion d’état : `ChangeNotifier` et `InheritedNotifier`,
+`flutter_timezone`, `shared_preferences` ; côté Android `androidx.health.connect:connect-client` 1.1.0 et `kotlinx-coroutines-android`. Gestion d’état : `ChangeNotifier` et `InheritedNotifier`,
 sans bibliothèque supplémentaire.
 
 ## Développement

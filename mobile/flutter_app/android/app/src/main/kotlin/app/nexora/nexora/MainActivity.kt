@@ -26,6 +26,7 @@ class MainActivity : FlutterActivity() {
     private var voice: VoiceBridge? = null
     private var bubble: BubbleBridge? = null
     private var session: MethodChannel? = null
+    private var health: HealthBridge? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -34,6 +35,7 @@ class MainActivity : FlutterActivity() {
         voice = VoiceBridge(this, messenger)
         bubble = BubbleBridge(this, messenger, inBubble = false)
         session = SessionHub.attach(messenger, "app")
+        health = HealthBridge(this, messenger)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -44,6 +46,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (health?.onActivityResult(requestCode) == true) return
         if (voice?.onPermissionResult(requestCode, grantResults) != true) {
             bubble?.onPermissionResult(requestCode)
         }
@@ -53,6 +56,8 @@ class MainActivity : FlutterActivity() {
         voice?.dispose()
         bubble?.dispose()
         session?.let(SessionHub::detach)
+        health?.dispose()
+        health = null
         voice = null
         bubble = null
         session = null
@@ -120,6 +125,7 @@ class MainActivity : FlutterActivity() {
     @Deprecated("FlutterActivity is not a ComponentActivity")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (health?.onActivityResult(requestCode) == true) return
         if (requestCode != PICK_FOLDER) return
         val result = pendingPick ?: return
         pendingPick = null
