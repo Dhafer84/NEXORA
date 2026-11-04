@@ -138,6 +138,11 @@ la base. Sans fournisseur IA configuré, il vérifie que l’envoi de message r�
 
 1. Code seul (schéma compatible) : `git checkout <commit précédent>` puis `$C build`
    et `$C up -d --wait`.
+   Étape 6 (`1eefcad`, déployée le 4 novembre 2026) : aucune migration (schéma
+   version 2) ; retour par `git checkout 627b374`, `build` et `up`. Sauvegarde
+   prise avant : `backups/nexora_avant_etape6_20261104_074805.dump`. Les routes
+   `/api/v1/analysis/*` répondent alors `404`, que l’application 0.7.0 signale
+   (« le serveur doit être mis à jour »).
 2. Schéma : avec le code actuel, qui contient les fichiers `down`, annuler les
    migrations postérieures à la version visée
    (`$C run --rm backend python -m app.migrate down <version>`), puis revenir au
