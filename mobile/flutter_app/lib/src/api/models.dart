@@ -256,6 +256,49 @@ class AiStatus {
   final String detail;
 }
 
+/// Recipient of an activity analysis, as the server describes it.
+class AnalysisRecipient {
+  const AnalysisRecipient({
+    required this.configured,
+    required this.label,
+    this.provider,
+    this.destination,
+  });
+
+  factory AnalysisRecipient.fromJson(Map<String, dynamic> json) =>
+      AnalysisRecipient(
+        provider: json['provider'] == null
+            ? null
+            : ProviderInfo.fromJson(_map(json['provider'])),
+        configured: json['configured'] as bool,
+        destination: json['destination'] as String?,
+        label: json['label'] as String,
+      );
+
+  final ProviderInfo? provider;
+  final bool configured;
+
+  /// Host the server sends to, e.g. `integrate.api.nvidia.com`.
+  final String? destination;
+  final String label;
+
+  /// Identity the confirmation is bound to.
+  String get key =>
+      '${provider?.name}|${provider?.model}|${provider?.real}|$destination';
+}
+
+class AnalysisResult {
+  const AnalysisResult({required this.text, required this.simulated});
+
+  factory AnalysisResult.fromJson(Map<String, dynamic> json) => AnalysisResult(
+    text: json['text'] as String,
+    simulated: json['simulated'] as bool,
+  );
+
+  final String text;
+  final bool simulated;
+}
+
 class Capacity {
   const Capacity({
     required this.totalBytes,

@@ -137,6 +137,26 @@ Erreurs : `503 ai_not_configured` (aucun fournisseur ou clé absente) ;
 `rate_limited`, `rejected`, `bad_response`). Le message de l’utilisateur et une
 réponse d’erreur restent dans l’historique. `404 conversation_not_found`.
 
+## Analyse d’activité (étape 6)
+
+| Méthode et route | Fonction |
+| --- | --- |
+| `GET /api/v1/analysis/recipient` | Destinataire d’une analyse, sans le contacter : `provider` (`name`, `model`, `real`), `configured`, `destination` (hôte, par exemple `integrate.api.nvidia.com`), `label`, `stored: false` |
+| `POST /api/v1/analysis/activity` | `{"summary": "...", "recipient": {"name": "...", "model": "..."}}` → `text`, `provider`, `destination`, `simulated` |
+
+Le téléphone calcule le résumé, l’affiche tel quel et ne l’envoie qu’après
+confirmation explicite pour le destinataire affiché. Le serveur fait **un seul
+appel** au fournisseur, sans outils ni historique, et **n’enregistre rien** : ni
+conversation, ni message, ni contenu dans les journaux (seulement les tailles,
+`activity_analysis status=ok chars_in=… chars_out=…`). Résumé de 6 000
+caractères au plus ; champs inconnus refusés (`422`).
+
+Erreurs : `409 recipient_changed` si le fournisseur ou le modèle du serveur
+diffère de celui confirmé (le téléphone demande une nouvelle confirmation, jamais
+de renvoi automatique) ; `503 ai_not_configured` ; `503 ai_<code>` en cas
+d’échec du fournisseur. Un serveur antérieur à l’étape 6 répond `404` :
+l’application affiche « le serveur doit être mis à jour ».
+
 ## Automatisations
 
 | Méthode et route | Permission | Fonction |

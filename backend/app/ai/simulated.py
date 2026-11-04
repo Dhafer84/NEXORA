@@ -3,6 +3,8 @@ from typing import Any
 
 from app.ai.base import ProviderReply, ToolCall
 
+ANALYSIS_PROMPT = "Tu reçois un résumé chiffré d’activité"
+
 KEYWORDS = {
     "server_metrics": ("cpu", "processeur", "mémoire", "memoire", "ram", "disque", "métrique"),
     "database_status": ("base", "postgres", "donnée"),
@@ -24,6 +26,12 @@ class SimulatedProvider:
         self, messages: list[dict[str, Any]], tools: list[dict[str, Any]], timeout: float
     ) -> ProviderReply:
         last = messages[-1]
+        if not tools and str(messages[0].get("content", "")).startswith(ANALYSIS_PROMPT):
+            # Isolated activity analysis (app/analysis.py): fixed text.
+            return ProviderReply(
+                text=f"Analyse simulée d’un résumé de {len(str(last.get('content', '')))} "
+                "caractères. Aucune IA réelle n’a été contactée."
+            )
         if last["role"] == "tool":
             return ProviderReply(text="Résultat de l’outil : " + last["content"])
         text = str(last.get("content", "")).lower()

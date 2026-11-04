@@ -76,6 +76,28 @@ class NexoraApi {
   Future<AiStatus> aiStatus() =>
       _object('GET', '/api/v1/ai/status', AiStatus.fromJson);
 
+  // ----- Activity analysis ---------------------------------------------------
+
+  /// Who would receive an analysis; the server does not contact it.
+  Future<AnalysisRecipient> analysisRecipient() =>
+      _object('GET', '/api/v1/analysis/recipient', AnalysisRecipient.fromJson);
+
+  /// Sends exactly [summary] to the confirmed [recipient], outside any
+  /// conversation. Never retried automatically.
+  Future<AnalysisResult> analyseActivity(
+    String summary,
+    ProviderInfo recipient,
+  ) => _object(
+    'POST',
+    '/api/v1/analysis/activity',
+    AnalysisResult.fromJson,
+    body: {
+      'summary': summary,
+      'recipient': {'name': recipient.name, 'model': recipient.model},
+    },
+    timeout: turnTimeout,
+  );
+
   // ----- Conversations -------------------------------------------------------
 
   Future<List<Conversation>> conversations({int limit = 50}) =>

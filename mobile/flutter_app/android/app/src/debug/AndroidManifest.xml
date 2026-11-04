@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.health.WRITE_SLEEP"/>
     <uses-permission android:name="android.permission.health.WRITE_HEART_RATE"/>
     <uses-permission android:name="android.permission.health.WRITE_EXERCISE"/>
+    <uses-permission android:name="android.permission.health.WRITE_DISTANCE"/>
     <!-- Debug only: HTTP to the emulator host for the local simulated backend. -->
     <application android:networkSecurityConfig="@xml/network_security_config"/>
 </manifest>

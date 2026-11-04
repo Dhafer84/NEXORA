@@ -14,6 +14,22 @@ class FakeFiles implements FileAccess {
   final List<String> operations = [];
   PickedFolder? pickResult = const PickedFolder(tree: tree, name: 'Download');
   String? failNextWith;
+
+  /// Answer of [checkAccess] for the remembered folder.
+  String access = 'ok';
+
+  /// Documents returned by [pickFiles]; null stands for a cancelled picker.
+  List<DeviceFile>? pickedFiles;
+
+  /// Picked documents the storage refuses to move (other provider).
+  final Set<String> unmovable = {};
+
+  /// Names already taken where picked documents are renamed.
+  final Set<String> takenNames = {};
+
+  /// Exports saved or shared: name and exact content.
+  final List<({String action, String name, String content})> exports = [];
+  String? saveAnswer = 'nexora-export.csv';
   int _ids = 0;
 
   String _add(
@@ -93,6 +109,61 @@ class FakeFiles implements FileAccess {
 
   @override
   Future<void> release(String tree) async => operations.add('release');
+
+  @override
+  Future<String> checkAccess(String tree) async {
+    operations.add('check');
+    return access;
+  }
+
+  @override
+  Future<List<DeviceFile>?> pickFiles(String? tree) async {
+    operations.add('pickFiles');
+    return pickedFiles;
+  }
+
+  @override
+  Future<void> moveFile(String uri, String tree, String targetId) async {
+    _maybeFail();
+    final file = pickedFiles!.firstWhere((f) => f.id == uri);
+    if (unmovable.contains(uri)) {
+      throw const FileOperationError('move_unsupported', moveUnsupported);
+    }
+    if (namesIn(targetId).contains(file.name)) {
+      throw const FileOperationError(
+        'name_taken',
+        'Nom déjà pris : rien n’a été modifié.',
+      );
+    }
+    operations.add('moveFile ${file.name} -> ${docs[targetId]!.name}');
+    _add(file.name, targetId);
+  }
+
+  @override
+  Future<void> renameFile(String uri, String tree, String name) async {
+    _maybeFail();
+    if (takenNames.contains(name)) {
+      throw const FileOperationError(
+        'name_taken',
+        'Un fichier du même nom existe déjà : rien n’a été modifié.',
+      );
+    }
+    final file = pickedFiles!.firstWhere((f) => f.id == uri);
+    operations.add('renameFile ${file.name} -> $name');
+  }
+
+  @override
+  Future<String?> saveExport(String name, String mime, String content) async {
+    exports.add((action: 'save', name: name, content: content));
+    return saveAnswer;
+  }
+
+  @override
+  Future<void> shareExport(String name, String mime, String content) async =>
+      exports.add((action: 'share', name: name, content: content));
+
+  @override
+  Future<void> purgeExports() async => operations.add('purgeExports');
 }
 
 class MemoryFolder implements FolderMemory {

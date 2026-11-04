@@ -118,6 +118,16 @@ résultat GitHub Actions, issues ouvertes, dernier commit. Lecture seule.
 - NEXORA n’accède qu’à **un dossier choisi** dans le sélecteur Android (Storage
   Access Framework), sans permission de stockage générale ; l’accès peut être
   retiré dans l’écran.
+- Le sélecteur s’ouvre sur Téléchargements, après une explication : Android
+  refuse la racine de Téléchargements et du stockage (« Impossible d’utiliser
+  ce dossier ») ; choisir ou créer un sous-dossier, par exemple
+  `Download/NEXORA`. L’accès durable en lecture et écriture est vérifié, et
+  revérifié à l’ouverture (accès retiré signalé). Aucune permission
+  `MANAGE_EXTERNAL_STORAGE`.
+- *Choisir des fichiers* (sélecteur `ACTION_OPEN_DOCUMENT`) : déplacement ou
+  renommage seulement pour un fichier situé dans le dossier autorisé ; un fichier
+  hors du dossier reçoit une note (le déplacer avec l’application Fichiers),
+  jamais une copie suivie d’une suppression.
 - Propositions calculées sur le téléphone, sans serveur ni IA : rangement par
   type dans des sous-dossiers (Documents, Tableurs, Présentations, Images,
   Vidéos, Audio, Archives, Applications) et noms lisibles pour les photos et
@@ -155,6 +165,40 @@ résultat GitHub Actions, issues ouvertes, dernier commit. Lecture seule.
   NEXORA ni au fournisseur IA. Titres et notes des entraînements ne sont pas lus.
   `HealthPrivacyActivity` explique cet usage depuis Health Connect.
 
+### Activité (onglet, étape 6)
+
+- Onglet **Activité** (présent quand Health Connect est géré) : pas, sommeil,
+  fréquence cardiaque et entraînements sur 60 jours au plus, **une permission
+  de lecture par catégorie** demandée au geste (les entraînements demandent aussi
+  la distance). Une catégorie refusée reste « Non autorisée » sans bloquer les
+  autres.
+- **Copie locale chiffrée** (stockage sécurisé Android, une entrée par
+  catégorie), remplacée en entier à chaque lecture : relire ne double rien.
+  Permission retirée, même application fermée : la copie de la catégorie est
+  effacée au prochain lancement. *Effacer la copie locale* supprime aussi les
+  exports temporaires.
+- Règles : un jour sans donnée n’est jamais compté zéro ; aujourd’hui et un jour
+  dont la dernière entrée finit avant 21:00 sont **partiels** ; comparaison avec
+  la période précédente seulement si les deux couvrent au moins 70 % des jours
+  et ont des nombres de jours proches ; une nuit compte au jour du réveil
+  (union de ses intervalles) ; fréquence cardiaque pondérée par le nombre de
+  mesures ; deux séances qui se recouvrent à 50 % ou plus comptent une fois ;
+  pas de Health Sync par défaut, sinon total Health Connect, jamais de somme des
+  sources.
+- Courbes 7 / 30 / 60 jours : jours manquants marqués, jours partiels en creux,
+  bande min–max, détail d’un point au toucher.
+- **Analyser avec l’IA** : résumé chiffré calculé sur le téléphone (sans
+  appareil ni paquet), affiché tel quel avec le destinataire
+  (`GET /api/v1/analysis/recipient`) ; envoi seulement après la case de
+  consentement, liée à ce texte et à ce destinataire (changer de période
+  l’annule). `409 recipient_changed` : nouvelle confirmation, jamais de renvoi.
+  Aucune conversation créée.
+- **Exporter pour ChatGPT** : CSV ou JSON, agrégats par jour par défaut ; le
+  détail des entrées (horaires, sources, modèle d’appareil) est un choix
+  distinct. Aperçu exact du fichier ; *Enregistrer* (sélecteur Android
+  `ACTION_CREATE_DOCUMENT`) ou *Partager* (copie temporaire dans le cache via
+  `FileProvider`, effacée au partage suivant). Rien ne passe par le serveur.
+
 ## Sécurité
 
 - Adresse et clé enregistrées ensemble dans une seule entrée du stockage sécurisé,
@@ -184,6 +228,7 @@ résultat GitHub Actions, issues ouvertes, dernier commit. Lecture seule.
 | `lib/src/session/` | Brouillons et préférences partagés entre fenêtres (`SharedPreferencesAsync`) ; tour en cours partagé (`TurnLock`, canal vers `SessionHub.kt`). |
 | `lib/src/voice/` | Dictée et lecture (`VoiceController`, canal vers `VoiceBridge.kt` : `SpeechRecognizer`, `TextToSpeech`). |
 | `lib/src/health/` | Diagnostic Health Connect : canal vers `HealthBridge.kt` (permissions, lecture d’une journée, agrégats), classement des sources et chevauchements (`health_summary.dart`). |
+| `lib/src/activity/` | Module Activité : modèles, calculs (`activity_stats.dart`), copie chiffrée (`activity_store.dart`), contrôleur, résumé IA et export (`activity_report.dart`) ; lecture native par plage dans `HealthRange.kt`. |
 | `lib/src/bubble/` | Bulle (canal vers `BubbleBridge.kt`) ; le mini-chat tourne dans `BubbleActivity` avec le point d’entrée `bubbleMain`. |
 | `lib/src/ui/` | Écrans, mini-chat, cartes de résultats, thème (couleurs, espacements, rayons dans `theme.dart`), marque N (`design/nexora_mark.svg`), formats français. |
 | `test/` | Tests unitaires et d’écrans ; `test/support/fake_backend.dart` imite le backend en mémoire. |

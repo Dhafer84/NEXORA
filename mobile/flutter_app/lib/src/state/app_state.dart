@@ -8,6 +8,7 @@ import '../alerts/background_alerts.dart';
 import '../api/api_error.dart';
 import '../bubble/bubble_service.dart';
 import '../files/file_access.dart';
+import '../activity/activity_store.dart';
 import '../health/health_service.dart';
 import '../session/session.dart';
 import '../storage/credentials_store.dart';
@@ -48,6 +49,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     this.voice,
     this.bubble,
     this.health,
+    this.activityStore,
     TurnLock? turns,
     SessionStore? session,
     this.window = 'app',
@@ -75,6 +77,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   /// Local Health Connect diagnostic (step 5 prototype); null where
   /// unsupported. Its readings stay in the screen, never in this state.
   final HealthService? health;
+
+  /// Last successful Health Connect reads kept on the phone (Activité).
+  final ActivityStore? activityStore;
 
   /// In-flight messages shared with the other NEXORA window.
   final TurnLock turns;

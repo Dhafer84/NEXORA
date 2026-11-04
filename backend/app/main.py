@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app import analysis
 from app.ai.engine import AssistantEngine
 from app.ai.factory import build_provider
 from app.api import router
@@ -158,4 +159,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"status": "authenticated"}
 
     app.include_router(router)
+    app.include_router(analysis.router)
     return app

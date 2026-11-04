@@ -26,6 +26,7 @@ class HealthStatus {
     this.historyFeature = false,
     this.historyGranted = false,
     this.debugSamples = false,
+    this.distanceGranted = false,
   });
 
   final HealthSdk sdk;
@@ -41,6 +42,9 @@ class HealthStatus {
 
   /// Debug build: sample entries can be written for an emulator.
   final bool debugSamples;
+
+  /// Workouts: reading distances was allowed too (separate toggle).
+  final bool distanceGranted;
 }
 
 /// One Health Connect entry, as written by its source application.
@@ -149,6 +153,15 @@ class HealthData extends HealthReading {
   bool get isEmpty => entries.isEmpty;
 }
 
+/// Several days of one category, as Android returned them (JSON-compatible:
+/// it is what the activity module keeps on the phone).
+class HealthRangeRaw extends HealthReading {
+  const HealthRangeRaw(this.category, this.raw);
+
+  final HealthCategory category;
+  final Map<String, Object?> raw;
+}
+
 class HealthDenied extends HealthReading {
   const HealthDenied();
 }
@@ -172,6 +185,13 @@ abstract class HealthService {
 
   /// One finished day, from 00:00 to 24:00 in the phone's time zone.
   Future<HealthReading> read(HealthCategory category, DateTime day);
+
+  /// Days [from] to [to] (`YYYY-MM-DD`, both included) of one category.
+  Future<HealthReading> range(HealthCategory category, String from, String to);
+
+  /// Debug builds: synthetic history of [days] days (see `HealthSamples.kt`).
+  /// Returns the number of entries, or -1 when permissions were requested.
+  Future<int> writeHistory(int days);
 
   /// Start of the oldest entry readable in this category, if any.
   Future<DateTime?> oldest(HealthCategory category);
@@ -211,6 +231,7 @@ class NativeHealthService implements HealthService {
         historyFeature: raw['historyFeature'] as bool? ?? false,
         historyGranted: raw['historyGranted'] as bool? ?? false,
         debugSamples: raw['debugSamples'] as bool? ?? false,
+        distanceGranted: raw['distanceGranted'] as bool? ?? false,
       );
     } on PlatformException {
       return HealthStatus(
@@ -268,6 +289,40 @@ class NativeHealthService implements HealthService {
       };
     }
   }
+
+  @override
+  Future<HealthReading> range(
+    HealthCategory category,
+    String from,
+    String to,
+  ) async {
+    try {
+      final raw = await _channel.invokeMethod<Map>('range', {
+        'category': category.wire,
+        'from': from,
+        'to': to,
+      });
+      if (raw == null) return const HealthFailed('empty');
+      return HealthRangeRaw(category, _json(raw) as Map<String, Object?>);
+    } on PlatformException catch (error) {
+      return switch (error.code) {
+        'permission_denied' => const HealthDenied(),
+        'unavailable' => const HealthUnavailable(),
+        _ => HealthFailed(error.code),
+      };
+    }
+  }
+
+  /// Channel maps and lists, made plain JSON values.
+  static Object? _json(Object? value) => switch (value) {
+    final Map m => {for (final e in m.entries) e.key as String: _json(e.value)},
+    final List l => [for (final v in l) _json(v)],
+    _ => value,
+  };
+
+  @override
+  Future<int> writeHistory(int days) async =>
+      await _channel.invokeMethod<int>('writeHistory', {'days': days}) ?? 0;
 
   @override
   Future<DateTime?> oldest(HealthCategory category) async {

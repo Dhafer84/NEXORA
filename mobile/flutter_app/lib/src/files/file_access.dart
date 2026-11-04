@@ -11,6 +11,8 @@ class DeviceFile {
     this.modified,
     this.canMove = true,
     this.canRename = true,
+    this.authority,
+    this.inFolder = false,
   });
 
   factory DeviceFile.fromMap(Map<Object?, Object?> map) => DeviceFile(
@@ -25,6 +27,22 @@ class DeviceFile {
     canRename: map['canRename'] as bool? ?? false,
   );
 
+  /// A document picked on its own: [id] is its content URI.
+  factory DeviceFile.picked(Map<Object?, Object?> map) {
+    final file = DeviceFile.fromMap({...map, 'id': map['uri']});
+    return DeviceFile(
+      id: file.id,
+      name: file.name,
+      mime: file.mime,
+      size: file.size,
+      modified: file.modified,
+      canMove: file.canMove,
+      canRename: file.canRename,
+      authority: map['authority'] as String?,
+      inFolder: map['inFolder'] as bool? ?? false,
+    );
+  }
+
   final String id;
   final String name;
   final String mime;
@@ -32,6 +50,13 @@ class DeviceFile {
   final DateTime? modified;
   final bool canMove;
   final bool canRename;
+
+  /// Storage that provides a picked document (Téléchargements, stockage…).
+  final String? authority;
+
+  /// A picked document inside the authorised folder: only there can NEXORA
+  /// check the neighbouring names before a move or a rename.
+  final bool inFolder;
 
   bool get isFolder => mime == folderMime;
 }
@@ -54,11 +79,33 @@ class FileOperationError implements Exception {
   String toString() => message;
 }
 
-/// Android Storage Access Framework, limited to the picked folder. No delete,
-/// no copy, no overwrite: only listing, creating a sub-folder, moving into it
-/// and renaming.
+/// Android Storage Access Framework, limited to the picked folder and to the
+/// files picked one by one. No delete, no copy, no overwrite: only listing,
+/// creating a sub-folder, moving into it and renaming. A move the storage
+/// refuses is reported, never replaced by a copy and a deletion.
 abstract class FileAccess {
+  /// Null when the user cancelled, e.g. after Android refused the root of
+  /// Download (« Impossible d’utiliser ce dossier »).
   Future<PickedFolder?> pickFolder();
+
+  /// `ok`, or `revoked` when the folder's access was withdrawn.
+  Future<String> checkAccess(String tree);
+
+  /// Documents picked one by one (the Download root included); null if
+  /// cancelled. Each says whether it lies inside the authorised [tree].
+  Future<List<DeviceFile>?> pickFiles(String? tree);
+
+  /// Moves a picked document of [tree] into its sub-folder [targetId].
+  Future<void> moveFile(String uri, String tree, String targetId);
+  Future<void> renameFile(String uri, String tree, String name);
+
+  /// Activité export: saved where the user chooses (null if cancelled).
+  Future<String?> saveExport(String name, String mime, String content);
+
+  /// Shared through Android's sheet, from a temporary file.
+  Future<void> shareExport(String name, String mime, String content);
+  Future<void> purgeExports();
+
   Future<List<DeviceFile>> listFiles(String tree);
 
   /// Returns the document id of the existing or created sub-folder.
@@ -67,6 +114,11 @@ abstract class FileAccess {
   Future<void> rename(String tree, String documentId, String name);
   Future<void> release(String tree);
 }
+
+const moveUnsupported =
+    'Android ne permet pas à NEXORA de déplacer ce fichier depuis cet emplacement : '
+    'rien n’a été modifié. Utilisez l’application Fichiers du téléphone (appui '
+    'long sur le fichier, puis Déplacer).';
 
 class ChannelFileAccess implements FileAccess {
   const ChannelFileAccess();
@@ -80,10 +132,15 @@ class ChannelFileAccess implements FileAccess {
       throw FileOperationError(error.code, switch (error.code) {
         'name_taken' =>
           'Un fichier du même nom existe déjà : rien n’a été modifié.',
-        'move_unsupported' =>
-          'Ce stockage ne permet pas le déplacement : rien n’a été modifié.',
+        'move_unsupported' => moveUnsupported,
         'rename_unsupported' =>
-          'Ce stockage ne permet pas le renommage : rien n’a été modifié.',
+          'Ce stockage ne permet pas à NEXORA de renommer ce fichier : rien n’a '
+              'été modifié. L’application Fichiers du téléphone peut le faire.',
+        'not_persistable' || 'no_write' =>
+          'Ce dossier n’accorde pas d’accès durable en écriture. Choisissez un '
+              'autre dossier, par exemple un sous-dossier de Téléchargements.',
+        'busy' => 'Une sélection est déjà ouverte.',
+        'write_failed' => 'Écriture impossible à cet emplacement.',
         'access_denied' =>
           'L’accès au dossier a été retiré. Choisissez-le de nouveau.',
         'invalid_name' => 'Nom refusé : pas de « / », ni de point au début.',
@@ -102,6 +159,52 @@ class ChannelFileAccess implements FileAccess {
       name: result['name']! as String,
     );
   }
+
+  @override
+  Future<String> checkAccess(String tree) =>
+      _call<String>('checkAccess', {'tree': tree});
+
+  @override
+  Future<List<DeviceFile>?> pickFiles(String? tree) async {
+    final items = await _call<List<Object?>?>('pickFiles', {'tree': tree});
+    return items == null
+        ? null
+        : [
+            for (final item in items)
+              DeviceFile.picked(item! as Map<Object?, Object?>),
+          ];
+  }
+
+  @override
+  Future<void> moveFile(String uri, String tree, String targetId) =>
+      _call<String>('moveFile', {
+        'uri': uri,
+        'tree': tree,
+        'targetId': targetId,
+      });
+
+  @override
+  Future<void> renameFile(String uri, String tree, String name) =>
+      _call<String>('renameFile', {'uri': uri, 'tree': tree, 'name': name});
+
+  @override
+  Future<String?> saveExport(String name, String mime, String content) =>
+      _call<String?>('saveExport', {
+        'name': name,
+        'mime': mime,
+        'content': content,
+      });
+
+  @override
+  Future<void> shareExport(String name, String mime, String content) =>
+      _call<bool>('shareExport', {
+        'name': name,
+        'mime': mime,
+        'content': content,
+      });
+
+  @override
+  Future<void> purgeExports() => _call<int>('purgeExports');
 
   @override
   Future<List<DeviceFile>> listFiles(String tree) async {

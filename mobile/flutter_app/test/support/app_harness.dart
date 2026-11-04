@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:nexora/main.dart';
+import 'package:nexora/src/activity/activity_store.dart';
 import 'package:nexora/src/alerts/background_alerts.dart';
 import 'package:nexora/src/bubble/bubble_service.dart';
 import 'package:nexora/src/files/file_access.dart';
@@ -50,6 +51,7 @@ Future<AppState> pumpApp(
   VoiceService? voice,
   BubbleService? bubble,
   HealthService? health,
+  ActivityStore? activityStore,
   TurnLock? turns,
   SessionStore? session,
 }) async {
@@ -62,6 +64,7 @@ Future<AppState> pumpApp(
     voice: voice,
     bubble: bubble,
     health: health,
+    activityStore: activityStore,
     turns: turns,
     session: session,
   );
@@ -83,6 +86,7 @@ Future<AppState> startState(
   VoiceService? voice,
   BubbleService? bubble,
   HealthService? health,
+  ActivityStore? activityStore,
   TurnLock? turns,
   SessionStore? session,
   String window = 'app',
@@ -107,6 +111,8 @@ Future<AppState> startState(
     voice: voice,
     bubble: bubble,
     health: health,
+    activityStore:
+        activityStore ?? (health == null ? null : MemoryActivityStore()),
     turns: turns,
     session: session,
     window: window,

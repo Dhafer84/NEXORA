@@ -10,6 +10,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.Record
@@ -66,6 +67,14 @@ class HealthBridge(
                 read(call.argument<String>("category") ?: "", LocalDate.parse(call.argument<String>("day")))
             }
             "oldest" -> run(result) { oldest(call.argument<String>("category") ?: "") }
+            "range" -> run(result) {
+                HealthRange(client).read(
+                    call.argument<String>("category") ?: "",
+                    LocalDate.parse(call.argument<String>("from")),
+                    LocalDate.parse(call.argument<String>("to")),
+                )
+            }
+            "writeHistory" -> run(result) { writeHistory(call.argument<Int>("days") ?: 45) }
             "openSettings" -> {
                 openSettings()
                 result.success(null)
@@ -113,6 +122,7 @@ class HealthBridge(
             "granted" to CATEGORIES.filter { (_, type) -> HealthPermission.getReadPermission(type) in granted }.keys.toList(),
             "historyFeature" to history,
             "historyGranted" to (HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY in granted),
+            "distanceGranted" to (HealthPermission.getReadPermission(DistanceRecord::class) in granted),
         )
     }
 
@@ -123,11 +133,16 @@ class HealthBridge(
         }
         if (pendingRequest != null) return result.error("busy", "Demande déjà en cours", null)
         pendingRequest = category to result
-        if (!askPermissions(setOf(HealthPermission.getReadPermission(type)), REQUEST_PERMISSION)) {
+        if (!askPermissions(permissionsOf(category, type), REQUEST_PERMISSION)) {
             pendingRequest = null
             result.error("unavailable", "Écran des autorisations introuvable", null)
         }
     }
+
+    /** Workouts also ask for distance, as a separate toggle the user may leave off. */
+    private fun permissionsOf(category: String, type: KClass<out Record>): Set<String> =
+        setOf(HealthPermission.getReadPermission(type)) +
+            if (category == "exercise") setOf(HealthPermission.getReadPermission(DistanceRecord::class)) else emptySet()
 
     /**
      * Shows Health Connect's permission screen. Android 14+ holds the health
@@ -352,6 +367,23 @@ class HealthBridge(
         )
         client.insertRecords(records)
         return records.size
+    }
+
+    /** Debug builds: [days] days of synthetic history (see [HealthSamples]). */
+    private suspend fun writeHistory(days: Int): Int {
+        if (!debuggable()) throw SecurityException("debug only")
+        val writes = setOf(
+            HealthPermission.getWritePermission(StepsRecord::class),
+            HealthPermission.getWritePermission(SleepSessionRecord::class),
+            HealthPermission.getWritePermission(HeartRateRecord::class),
+            HealthPermission.getWritePermission(ExerciseSessionRecord::class),
+            HealthPermission.getWritePermission(DistanceRecord::class),
+        )
+        if (!client.permissionController.getGrantedPermissions().containsAll(writes)) {
+            askPermissions(writes, REQUEST_WRITE)
+            return -1
+        }
+        return HealthSamples.write(client, days.coerceIn(1, 90))
     }
 
     fun dispose() {

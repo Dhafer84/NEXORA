@@ -18,13 +18,15 @@ class HealthPrivacyActivity : Activity() {
             setPadding(padding, padding, padding, padding)
             textSize = 16f
             text = """
-                Diagnostic santé de NEXORA (prototype)
+                Données de santé dans NEXORA
 
-                NEXORA lit dans Health Connect, seulement après votre autorisation et catégorie par catégorie : les pas, le sommeil, la fréquence cardiaque et les entraînements.
+                NEXORA lit dans Health Connect, seulement après votre autorisation et catégorie par catégorie : les pas, le sommeil, la fréquence cardiaque, les entraînements et leur distance.
 
-                Ces données servent uniquement à l’écran de diagnostic de ce téléphone : total d’une journée, date, fuseau horaire et application d’origine des entrées (par exemple Health Sync).
+                Ces données servent à l’onglet Activité et au diagnostic : totaux par jour, courbes, date, fuseau horaire et application d’origine des entrées (par exemple Health Sync).
 
-                Elles restent sur ce téléphone. NEXORA ne les enregistre pas, ne les écrit pas dans ses journaux et ne les envoie ni à son serveur ni à un fournisseur d’IA.
+                Elles restent sur ce téléphone, dans une copie chiffrée des dernières lectures que vous pouvez effacer depuis l’onglet Activité. NEXORA ne les écrit pas dans ses journaux et ne les sauvegarde pas ailleurs.
+
+                Rien n’est envoyé au serveur NEXORA ni à un fournisseur d’IA, sauf si vous demandez « Analyser avec l’IA » : NEXORA vous montre alors le résumé chiffré exact et son destinataire, et n’envoie ce seul résumé qu’après votre confirmation. Un export CSV ou JSON n’est enregistré ou partagé que lorsque vous le choisissez.
 
                 Vous pouvez retirer ces autorisations à tout moment dans Health Connect.
             """.trimIndent()

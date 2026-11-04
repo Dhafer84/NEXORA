@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the temporary export folder is shared (see MainActivity.share). -->
+<paths>
+    <cache-path name="exports" path="exports/"/>
+</paths>

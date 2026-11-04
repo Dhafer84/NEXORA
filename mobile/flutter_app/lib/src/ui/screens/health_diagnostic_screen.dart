@@ -320,7 +320,7 @@ class _CategoryCard extends StatelessWidget {
     HealthData() => ('Données lues', 'ok'),
     HealthDenied() => ('Permission refusée', 'error'),
     HealthUnavailable() => ('Indisponible', 'error'),
-    HealthFailed() => ('Erreur de lecture', 'error'),
+    HealthFailed() || HealthRangeRaw() => ('Erreur de lecture', 'error'),
     null when !granted => ('Non autorisée', 'neutral'),
     null => ('Autorisée', 'neutral'),
   };
@@ -454,6 +454,7 @@ class _ReadingView extends StatelessWidget {
       tone: 'error',
       message: 'Health Connect ne répond pas. Réessayez plus tard.',
     ),
+    HealthRangeRaw() => const SizedBox.shrink(),
     HealthFailed(:final code) => NoticeBar(
       tone: 'error',
       message: 'La lecture a échoué ($code). Aucune donnée n’a été conservée.',

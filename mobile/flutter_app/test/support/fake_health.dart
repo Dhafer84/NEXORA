@@ -8,9 +8,11 @@ class FakeHealth implements HealthService {
     Set<HealthCategory>? granted,
     Map<HealthCategory, List<HealthEntry>>? entries,
     Set<HealthCategory>? refuse,
+    Map<HealthCategory, Map<String, Object?>>? ranges,
   }) : granted = granted ?? {},
        entries = entries ?? {},
-       refuse = refuse ?? {};
+       refuse = refuse ?? {},
+       ranges = ranges ?? {};
 
   HealthSdk sdk;
   final Set<HealthCategory> granted;
@@ -19,6 +21,12 @@ class FakeHealth implements HealthService {
   /// Categories the user refuses on the permission screen.
   final Set<HealthCategory> refuse;
   int? stepsTotal;
+
+  /// Answer of a range read per category (see activity_samples.dart).
+  final Map<HealthCategory, Map<String, Object?>> ranges;
+
+  /// Failure code of the next range reads, per category.
+  final Map<HealthCategory, String> failRange = {};
   final List<String> calls = [];
   final List<DateTime> days = [];
 
@@ -73,4 +81,26 @@ class FakeHealth implements HealthService {
 
   @override
   Future<int> writeSamples(DateTime day) async => 0;
+
+  @override
+  Future<HealthReading> range(
+    HealthCategory category,
+    String from,
+    String to,
+  ) async {
+    calls.add('range:${category.wire}:$from:$to');
+    if (!granted.contains(category)) return const HealthDenied();
+    if (failRange[category] case final code?) return HealthFailed(code);
+    return HealthRangeRaw(
+      category,
+      ranges[category] ??
+          {'zone': 'Africa/Tunis', 'from': from, 'to': to, 'readAt': 0},
+    );
+  }
+
+  @override
+  Future<int> writeHistory(int days) async {
+    calls.add('writeHistory:$days');
+    return 0;
+  }
 }

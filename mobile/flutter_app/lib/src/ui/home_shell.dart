@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../bubble/bubble_service.dart';
 import '../state/app_state.dart';
+import 'activity/activity_screen.dart';
 import 'screens/approval_detail_screen.dart';
 import 'screens/automations_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -20,8 +21,11 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   static const _messages = 0;
-  static const _settings = 3;
   int _index = _messages;
+
+  /// Réglages is the last tab; Activité comes before it where Health
+  /// Connect is supported.
+  int get _settings => AppScope.read(context).health == null ? 3 : 4;
   StreamSubscription<LaunchRequest>? _launches;
 
   @override
@@ -88,6 +92,7 @@ class _HomeShellState extends State<HomeShell> {
       ),
       const DashboardScreen(),
       const AutomationsScreen(),
+      if (state.health != null) const ActivityScreen(),
       const SettingsScreen(),
     ];
     return Scaffold(
@@ -95,23 +100,29 @@ class _HomeShellState extends State<HomeShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (index) => setState(() => _index = index),
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.chat_outlined),
             selectedIcon: Icon(Icons.chat_rounded),
             label: 'Messages',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.dns_outlined),
             selectedIcon: Icon(Icons.dns_rounded),
             label: 'Serveur',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.check_box_outlined),
             selectedIcon: Icon(Icons.check_box_rounded),
             label: 'Tâches',
           ),
-          NavigationDestination(
+          if (state.health != null)
+            const NavigationDestination(
+              icon: Icon(Icons.directions_walk_outlined),
+              selectedIcon: Icon(Icons.directions_walk_rounded),
+              label: 'Activité',
+            ),
+          const NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings_rounded),
             label: 'Réglages',

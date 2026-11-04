@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'src/activity/activity_store.dart';
 import 'src/alerts/background_alerts.dart';
 import 'src/bubble/bubble_service.dart';
 import 'src/files/file_access.dart';
@@ -27,6 +28,7 @@ Future<void> main() async {
     voice: NativeVoiceService(),
     bubble: NativeBubbleService(),
     health: NativeHealthService(),
+    activityStore: VaultActivityStore(),
     turns: NativeTurnLock(),
     session: PreferencesSessionStore(),
     timezone: () async => (await FlutterTimezone.getLocalTimezone()).identifier,

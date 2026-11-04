@@ -49,4 +49,6 @@ dependencies {
     // Health Connect: local read of steps, sleep, heart rate and workouts (HealthBridge.kt).
     implementation("androidx.health.connect:connect-client:1.1.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    // FileProvider: an export is shared as a temporary file, never a public one.
+    implementation("androidx.core:core:1.13.1")
 }
