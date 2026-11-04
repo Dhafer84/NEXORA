@@ -63,6 +63,26 @@ void main() {
       expect(stepsOverlap(data, '2026-11-02'), 1000);
     });
 
+    test(
+      'sans Health Sync : pas du téléphone, via le total Health Connect',
+      () {
+        final raw = stepsRaw();
+        final phone = (raw['origins'] as List).last as Map<String, Object?>;
+        final data = _steps({
+          ...raw,
+          'days': phone['days'],
+          'origins': [phone],
+        });
+        expect(defaultStepsSource(data), allSources);
+        final points = stepsSeries(data, allSources, [
+          '2026-11-02',
+          sampleToday,
+        ], sampleToday);
+        expect(points.first.value, 1500);
+        expect(points.last.state, DayState.partial);
+      },
+    );
+
     test('comparaison seulement à couverture comparable', () {
       final full = _steps();
       final w = windows('2026-11-02', 7);
